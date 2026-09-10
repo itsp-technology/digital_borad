@@ -76,6 +76,61 @@ class FloatingToolbar extends StatelessWidget {
                 onChanged: controller.setStrokeWidth,
               ),
               _buildDivider(),
+
+              // Slide Deck Navigation & Drawer Trigger
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 15, color: Colors.white70),
+                    onPressed: controller.currentPageIndex > 0 ? controller.previousPage : null,
+                  ),
+                  InkWell(
+                    onTap: controller.toggleSlideDrawer,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: controller.isSlideDrawerOpen
+                            ? const Color(0xFF00FFA3).withValues(alpha: 0.3)
+                            : const Color(0xFF00FFA3).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF00FFA3).withValues(alpha: 0.6),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.view_sidebar_rounded, size: 13, color: Color(0xFF00FFA3)),
+                          const SizedBox(width: 5),
+                          Text(
+                            'SLIDE ${controller.currentPageIndex + 1}/${controller.totalPages}',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF00FFA3),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.white70),
+                    onPressed: controller.currentPageIndex < controller.totalPages - 1
+                        ? controller.nextPage
+                        : null,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline_rounded, size: 18, color: Color(0xFF00FFA3)),
+                    tooltip: 'New Slide (+)',
+                    onPressed: controller.addNewPage,
+                  ),
+                ],
+              ),
+
+              _buildDivider(),
               IconButton(
                 tooltip: 'Change Background Theme',
                 icon: const Icon(Icons.grid_4x4_rounded, size: 20, color: Colors.white70),
@@ -92,7 +147,7 @@ class FloatingToolbar extends StatelessWidget {
                 onPressed: controller.canRedo ? controller.redo : null,
               ),
               IconButton(
-                tooltip: 'Wipe Clean',
+                tooltip: 'Wipe Slide',
                 icon: const Icon(Icons.delete_sweep_rounded, size: 20, color: Color(0xFFFF4545)),
                 onPressed: controller.clearCanvas,
               ),

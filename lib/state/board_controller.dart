@@ -7,26 +7,46 @@ import '../models/tool_type.dart';
 enum BoardThemeMode { grid, dots, lines, blank }
 
 class BoardController extends ChangeNotifier {
-  final List<Stroke> _strokes = [];
+  final List<List<Stroke>> _pages = [[]];
+  int _currentPageIndex = 0;
+  bool _isSlideDrawerOpen = false;
+
   final List<Stroke> _redoStack = [];
   Stroke? _activeStroke;
   List<Offset> _laserTrail = [];
   Timer? _laserTimer;
 
   ToolType _currentTool = ToolType.pen;
-  Color _selectedColor = const Color(0xFF00FFA3); // Cyber Mint
+  Color _selectedColor = const Color(0xFF00FFA3);
   double _strokeWidth = 4.0;
   BoardThemeMode _themeMode = BoardThemeMode.dots;
 
-  List<Stroke> get strokes => List.unmodifiable(_strokes);
+  // Getters
+  List<Stroke> get strokes => List.unmodifiable(_pages[_currentPageIndex]);
+  List<List<Stroke>> get allPages => List.unmodifiable(_pages);
   Stroke? get activeStroke => _activeStroke;
   List<Offset> get laserTrail => List.unmodifiable(_laserTrail);
   ToolType get currentTool => _currentTool;
   Color get selectedColor => _selectedColor;
   double get strokeWidth => _strokeWidth;
   BoardThemeMode get themeMode => _themeMode;
-  bool get canUndo => _strokes.isNotEmpty;
+  int get currentPageIndex => _currentPageIndex;
+  int get totalPages => _pages.length;
+  bool get isSlideDrawerOpen => _isSlideDrawerOpen;
+  bool get canUndo => _pages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
+
+  void toggleSlideDrawer() {
+    _isSlideDrawerOpen = !_isSlideDrawerOpen;
+    notifyListeners();
+  }
+
+  void closeSlideDrawer() {
+    if (_isSlideDrawerOpen) {
+      _isSlideDrawerOpen = false;
+      notifyListeners();
+    }
+  }
 
   void setTool(ToolType tool) {
     _currentTool = tool;
@@ -47,6 +67,59 @@ class BoardController extends ChangeNotifier {
     final nextIndex = (_themeMode.index + 1) % BoardThemeMode.values.length;
     _themeMode = BoardThemeMode.values[nextIndex];
     notifyListeners();
+  }
+
+  // Slide Management
+  void addNewPage() {
+    _pages.add([]);
+    _currentPageIndex = _pages.length - 1;
+    _redoStack.clear();
+    _activeStroke = null;
+    notifyListeners();
+  }
+
+  void goToPage(int index) {
+    if (index >= 0 && index < _pages.length) {
+      _currentPageIndex = index;
+      _redoStack.clear();
+      _activeStroke = null;
+      notifyListeners();
+    }
+  }
+
+  void deletePage(int index) {
+    if (_pages.length <= 1) {
+      _pages[0].clear();
+    } else {
+      _pages.removeAt(index);
+      if (_currentPageIndex >= _pages.length) {
+        _currentPageIndex = _pages.length - 1;
+      }
+    }
+    _redoStack.clear();
+    _activeStroke = null;
+    notifyListeners();
+  }
+
+  void nextPage() {
+    if (_currentPageIndex < _pages.length - 1) {
+      _currentPageIndex++;
+    } else {
+      _pages.add([]);
+      _currentPageIndex++;
+    }
+    _redoStack.clear();
+    _activeStroke = null;
+    notifyListeners();
+  }
+
+  void previousPage() {
+    if (_currentPageIndex > 0) {
+      _currentPageIndex--;
+      _redoStack.clear();
+      _activeStroke = null;
+      notifyListeners();
+    }
   }
 
   void startStroke(Offset position, double pressure) {
@@ -117,28 +190,28 @@ class BoardController extends ChangeNotifier {
     }
 
     if (_activeStroke != null) {
-      _strokes.add(_activeStroke!);
+      _pages[_currentPageIndex].add(_activeStroke!);
       _activeStroke = null;
       notifyListeners();
     }
   }
 
   void undo() {
-    if (_strokes.isNotEmpty) {
-      _redoStack.add(_strokes.removeLast());
+    if (_pages[_currentPageIndex].isNotEmpty) {
+      _redoStack.add(_pages[_currentPageIndex].removeLast());
       notifyListeners();
     }
   }
 
   void redo() {
     if (_redoStack.isNotEmpty) {
-      _strokes.add(_redoStack.removeLast());
+      _pages[_currentPageIndex].add(_redoStack.removeLast());
       notifyListeners();
     }
   }
 
   void clearCanvas() {
-    _strokes.clear();
+    _pages[_currentPageIndex].clear();
     _redoStack.clear();
     _activeStroke = null;
     _laserTrail.clear();

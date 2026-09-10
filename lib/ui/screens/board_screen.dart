@@ -4,6 +4,7 @@ import '../../painter/board_painter.dart';
 import '../../state/board_controller.dart';
 import '../widgets/floating_toolbar.dart';
 import '../widgets/grid_background.dart';
+import '../widgets/slide_drawer.dart';
 
 class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
@@ -26,7 +27,7 @@ class _BoardScreenState extends State<BoardScreen> {
           // 1. Dynamic background grid
           GridBackground(mode: controller.themeMode),
 
-          // 2. Main low-latency inking canvas
+          // 2. Inking surface
           Listener(
             behavior: HitTestBehavior.opaque,
             onPointerDown: (e) {
@@ -48,7 +49,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 3. Cyber Telemetry Status Bar
+          // 3. Cyber Telemetry HUD
           Positioned(
             bottom: 16,
             left: 20,
@@ -64,7 +65,7 @@ class _BoardScreenState extends State<BoardScreen> {
                   const Icon(Icons.bolt, size: 14, color: Color(0xFF00FFA3)),
                   const SizedBox(width: 6),
                   Text(
-                    'NovaSlate • LATENCY: ~0ms • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()}) • MODE: ${controller.themeMode.name.toUpperCase()}',
+                    'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • LATENCY: ~0ms • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
@@ -77,7 +78,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 4. Centered Floating Acrylic Dock
+          // 4. Centered Floating Acrylic Toolbar
           const Positioned(
             top: 24,
             left: 0,
@@ -85,6 +86,16 @@ class _BoardScreenState extends State<BoardScreen> {
             child: Center(
               child: FloatingToolbar(),
             ),
+          ),
+
+          // 5. Left Animated Slide Deck Drawer
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOutCubic,
+            left: controller.isSlideDrawerOpen ? 0 : -230,
+            top: 0,
+            bottom: 0,
+            child: const SlideDrawer(),
           ),
         ],
       ),
