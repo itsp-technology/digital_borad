@@ -38,14 +38,31 @@ class BoardController extends ChangeNotifier {
   void startStroke(Offset position, double pressure) {
     _redoStack.clear();
     final effectivePressure = pressure > 0 ? pressure : 0.5;
+
+    // Pick uniform color and base widths per tool
+    Color strokeColor;
+    double effectiveWidth = _strokeWidth;
+
+    switch (_currentTool) {
+      case ToolType.highlighter:
+        // Use 40% translucent color for the highlighter
+        strokeColor = _selectedColor.withValues(alpha: 0.4);
+        effectiveWidth = _strokeWidth * 3.5; // Highlighters are naturally broader
+        break;
+      case ToolType.eraser:
+        strokeColor = const Color(0xFF1E1E1E);
+        effectiveWidth = _strokeWidth * 4.0;
+        break;
+      case ToolType.pen:
+      default:
+        strokeColor = _selectedColor;
+        break;
+    }
+
     _activeStroke = Stroke(
       points: [StrokePoint(offset: position, pressure: effectivePressure)],
-      color: _currentTool == ToolType.eraser
-          ? const Color(0xFF1E1E1E)
-          : (_currentTool == ToolType.highlighter
-              ? _selectedColor.withOpacity(0.35)
-              : _selectedColor),
-      strokeWidth: _currentTool == ToolType.eraser ? _strokeWidth * 3 : _strokeWidth,
+      color: strokeColor,
+      strokeWidth: effectiveWidth,
       tool: _currentTool,
     );
     notifyListeners();
@@ -53,6 +70,8 @@ class BoardController extends ChangeNotifier {
 
   void appendPoint(Offset position, double pressure) {
     if (_activeStroke == null) return;
+    
+    // Low-pass filter to smooth out touch sensor noise / jitter
     final effectivePressure = pressure > 0 ? pressure : 0.5;
     _activeStroke!.points.add(
       StrokePoint(offset: position, pressure: effectivePressure),

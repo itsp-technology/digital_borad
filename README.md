@@ -58,3 +58,23 @@ flutter pub add flutter_colorpicker provider
 
 *Verification:* The terminal should show `All done!` followed by `Changed 2 dependencies!`.
 
+
+
+---------------------------------------------------
+---
+
+Testing and Building the Web App
+Once the code is in place:
+
+Test locally in Chrome:
+
+Bash
+flutter run -d chrome
+Compile for Cloudflare Pages (Wasm / CanvasKit):
+
+Bash
+flutter build web --release --web-renderer canvaskit
+Deploy the output folder (build/web) directly via Wrangler:
+
+Bash
+npx wrangler pages deploy build/web --project-name=digital-board
