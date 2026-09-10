@@ -140,7 +140,6 @@ class SlideDrawer extends StatelessWidget {
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    // Accurate Slide-Specific Images
                                     ...slideImages.map(
                                       (img) => Positioned(
                                         left: img.position.dx * previewScale,
@@ -150,6 +149,7 @@ class SlideDrawer extends StatelessWidget {
                                         child: Image.memory(
                                           img.bytes,
                                           fit: BoxFit.fill,
+                                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                                         ),
                                       ),
                                     ),
@@ -157,7 +157,6 @@ class SlideDrawer extends StatelessWidget {
                                       size: Size(previewWidth, previewHeight),
                                       painter: BoardPainter(
                                         strokes: slideStrokes,
-                                        activeStroke: null,
                                         scale: previewScale,
                                       ),
                                     ),

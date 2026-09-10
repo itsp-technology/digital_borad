@@ -34,94 +34,36 @@ class _InteractiveImageWidgetState extends State<InteractiveImageWidget> {
             controller.selectImage(widget.index);
           }
         },
-        onPanUpdate: (details) {
-          if (isSelectMode && widget.image.isSelected) {
-            controller.updateImagePosition(widget.index, details.delta);
-          }
-        },
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: widget.image.width,
-              height: widget.image.height,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: (widget.image.isSelected && isSelectMode)
-                      ? const Color(0xFF00FFA3)
-                      : Colors.transparent,
-                  width: 2.0,
-                ),
-                boxShadow: (widget.image.isSelected && isSelectMode)
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFF00FFA3).withValues(alpha: 0.35),
-                          blurRadius: 18,
-                        ),
-                      ]
-                    : [],
-              ),
-              child: Image.memory(
-                widget.image.bytes,
-                fit: BoxFit.fill,
-                filterQuality: FilterQuality.medium,
+        child: Container(
+          width: widget.image.width,
+          height: widget.image.height,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: (widget.image.isSelected && isSelectMode)
+                  ? const Color(0xFF6965DB)
+                  : Colors.transparent,
+              width: 2.0,
+            ),
+            boxShadow: (widget.image.isSelected && isSelectMode)
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF6965DB).withValues(alpha: 0.35),
+                      blurRadius: 18,
+                    ),
+                  ]
+                : [],
+          ),
+          child: Image.memory(
+            widget.image.bytes,
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: const Color(0xFF1B1F2A),
+              child: const Center(
+                child: Icon(Icons.broken_image_rounded, color: Colors.white38, size: 36),
               ),
             ),
-
-            // Resize & Scale Handle (Bottom-Right)
-            if (widget.image.isSelected && isSelectMode)
-              Positioned(
-                right: -16,
-                bottom: -16,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanUpdate: (details) {
-                    controller.updateImageSize(
-                      widget.index,
-                      details.delta.dx,
-                      details.delta.dy,
-                    );
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00FFA3),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 2.5),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black45, blurRadius: 4),
-                      ],
-                    ),
-                    child: const Icon(Icons.aspect_ratio_rounded, size: 16, color: Colors.black),
-                  ),
-                ),
-              ),
-
-            // Delete Image Button (Top-Right)
-            if (widget.image.isSelected && isSelectMode)
-              Positioned(
-                right: -16,
-                top: -16,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: controller.deleteSelectedImage,
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF3366),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black45, blurRadius: 4),
-                      ],
-                    ),
-                    child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
-                  ),
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );

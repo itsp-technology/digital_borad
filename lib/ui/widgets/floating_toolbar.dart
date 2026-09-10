@@ -18,23 +18,23 @@ class FloatingToolbar extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 0),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
+          filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
           child: Container(
             constraints: BoxConstraints(
               maxWidth: isMobile ? MediaQuery.of(context).size.width - 16 : 1180,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF121620).withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.2),
+              color: const Color(0xFF232329).withValues(alpha: 0.94), // Excalidraw dark theme surface
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.0),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 25,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -44,12 +44,13 @@ class FloatingToolbar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Pin & Palm Controls
                   IconButton(
                     tooltip: controller.isToolbarPinned ? 'Pinned' : 'Auto-Hides',
                     icon: Icon(
                       controller.isToolbarPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
                       size: 18,
-                      color: controller.isToolbarPinned ? const Color(0xFF00FFA3) : Colors.white38,
+                      color: controller.isToolbarPinned ? const Color(0xFF6965DB) : Colors.white38,
                     ),
                     onPressed: controller.toggleToolbarPin,
                   ),
@@ -64,81 +65,72 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // Select / Move & Scale Images/PDFs
-                  _ToolIcon(
-                    icon: Icons.pan_tool_alt_rounded,
-                    activeColor: const Color(0xFF00E5FF),
+                  // 1. Selection / Transform Tool
+                  _ExcaliToolButton(
+                    icon: Icons.near_me_outlined,
                     isSelected: controller.currentTool == ToolType.select,
                     onTap: () => controller.setTool(ToolType.select),
-                    tooltip: 'Select / Move & Resize Image',
+                    tooltip: 'Selection (V)',
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 4),
 
-                  // Freehand Tools
-                  _ToolIcon(
+                  // 2. Freehand Inking (Draw)
+                  _ExcaliToolButton(
                     icon: Icons.edit_rounded,
-                    activeColor: const Color(0xFF00FFA3),
                     isSelected: controller.currentTool == ToolType.pen,
                     onTap: () => controller.setTool(ToolType.pen),
-                    tooltip: 'Pen',
+                    tooltip: 'Draw (P)',
                   ),
-                  const SizedBox(width: 3),
-                  _ToolIcon(
+                  const SizedBox(width: 4),
+                  _ExcaliToolButton(
                     icon: Icons.brush_rounded,
-                    activeColor: const Color(0xFFFFE600),
                     isSelected: controller.currentTool == ToolType.highlighter,
                     onTap: () => controller.setTool(ToolType.highlighter),
                     tooltip: 'Highlighter',
                   ),
-                  const SizedBox(width: 3),
-                  _ToolIcon(
+                  const SizedBox(width: 4),
+                  _ExcaliToolButton(
                     icon: Icons.flare_rounded,
-                    activeColor: const Color(0xFFFF0055),
                     isSelected: controller.currentTool == ToolType.laser,
                     onTap: () => controller.setTool(ToolType.laser),
-                    tooltip: 'Laser',
+                    tooltip: 'Laser Pointer',
                   ),
-                  const SizedBox(width: 3),
-                  _ToolIcon(
+                  const SizedBox(width: 4),
+                  _ExcaliToolButton(
                     icon: Icons.auto_fix_high_rounded,
-                    activeColor: Colors.blueAccent,
                     isSelected: controller.currentTool == ToolType.eraser,
                     onTap: () => controller.setTool(ToolType.eraser),
-                    tooltip: 'Eraser',
+                    tooltip: 'Eraser (E)',
                   ),
                   _buildDivider(),
 
-                  // Geometric Shapes
-                  _ToolIcon(
+                  // 3. Excalidraw Geometric Shapes
+                  _ExcaliToolButton(
                     icon: Icons.horizontal_rule_rounded,
-                    activeColor: const Color(0xFF00E5FF),
                     isSelected: controller.currentTool == ToolType.line,
                     onTap: () => controller.setTool(ToolType.line),
-                    tooltip: 'Line',
+                    tooltip: 'Line (L)',
                   ),
-                  const SizedBox(width: 3),
-                  _ToolIcon(
+                  const SizedBox(width: 4),
+                  _ExcaliToolButton(
                     icon: Icons.arrow_outward_rounded,
-                    activeColor: const Color(0xFF00E5FF),
                     isSelected: controller.currentTool == ToolType.arrow,
                     onTap: () => controller.setTool(ToolType.arrow),
-                    tooltip: 'Arrow',
+                    tooltip: 'Arrow (A)',
                   ),
-                  const SizedBox(width: 3),
-                  _ToolIcon(
+                  const SizedBox(width: 4),
+                  _ExcaliToolButton(
                     icon: Icons.crop_square_rounded,
-                    activeColor: const Color(0xFF00E5FF),
                     isSelected: controller.currentTool == ToolType.rectangle,
                     onTap: () => controller.setTool(ToolType.rectangle),
-                    tooltip: 'Rectangle',
+                    tooltip: 'Rectangle (R)',
                   ),
-                  const SizedBox(width: 3),
-                  _ToolIcon(
+                  const SizedBox(width: 4),
+                  _ExcaliToolButton(
                     icon: Icons.panorama_fish_eye_rounded,
-                    activeColor: const Color(0xFF00E5FF),
                     isSelected: controller.currentTool == ToolType.circle,
                     onTap: () => controller.setTool(ToolType.circle),
-                    tooltip: 'Circle',
+                    tooltip: 'Ellipse (O)',
                   ),
                   _buildDivider(),
 
@@ -154,41 +146,41 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // Import PDF / Image
+                  // Media Import
                   IconButton(
-                    tooltip: 'Import PDF / Image to Board',
-                    icon: const Icon(Icons.note_add_rounded, size: 20, color: Color(0xFF00E5FF)),
+                    tooltip: 'Insert PDF / Image',
+                    icon: const Icon(Icons.image_outlined, size: 20, color: Colors.white70),
                     onPressed: controller.importMedia,
                   ),
 
-                  // Background Pattern
+                  // Background Grid Mode
                   IconButton(
-                    tooltip: 'Grid Pattern',
+                    tooltip: 'Change Canvas Background',
                     icon: const Icon(Icons.grid_4x4_rounded, size: 19, color: Colors.white70),
                     onPressed: controller.toggleTheme,
                   ),
 
-                  // Export Notes
+                  // Export Slide
                   IconButton(
-                    tooltip: 'Export Slide to Notes',
-                    icon: const Icon(Icons.download_rounded, size: 19, color: Color(0xFF00FFA3)),
+                    tooltip: 'Export Image (PNG)',
+                    icon: const Icon(Icons.download_rounded, size: 19, color: Color(0xFF6965DB)),
                     onPressed: onExport,
                   ),
 
-                  // History & Wipe
+                  // History
                   IconButton(
-                    tooltip: 'Undo',
+                    tooltip: 'Undo (Ctrl+Z)',
                     icon: const Icon(Icons.undo_rounded, size: 19, color: Colors.white70),
                     onPressed: controller.canUndo ? controller.undo : null,
                   ),
                   IconButton(
-                    tooltip: 'Redo',
+                    tooltip: 'Redo (Ctrl+Y)',
                     icon: const Icon(Icons.redo_rounded, size: 19, color: Colors.white70),
                     onPressed: controller.canRedo ? controller.redo : null,
                   ),
                   IconButton(
-                    tooltip: 'Wipe Clean',
-                    icon: const Icon(Icons.delete_sweep_rounded, size: 19, color: Color(0xFFFF4545)),
+                    tooltip: 'Clear Canvas',
+                    icon: const Icon(Icons.delete_outline_rounded, size: 19, color: Color(0xFFFF5252)),
                     onPressed: controller.clearCanvas,
                   ),
                 ],
@@ -202,7 +194,7 @@ class FloatingToolbar extends StatelessWidget {
 
   static Widget _buildDivider() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 6),
       height: 22,
       width: 1.0,
       color: Colors.white12,
@@ -210,16 +202,14 @@ class FloatingToolbar extends StatelessWidget {
   }
 }
 
-class _ToolIcon extends StatelessWidget {
+class _ExcaliToolButton extends StatelessWidget {
   final IconData icon;
-  final Color activeColor;
   final bool isSelected;
   final VoidCallback onTap;
   final String tooltip;
 
-  const _ToolIcon({
+  const _ExcaliToolButton({
     required this.icon,
-    required this.activeColor,
     required this.isSelected,
     required this.onTap,
     required this.tooltip,
@@ -232,20 +222,16 @@ class _ToolIcon extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.all(7),
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isSelected ? activeColor.withValues(alpha: 0.18) : Colors.transparent,
+            color: isSelected ? const Color(0xFF6965DB) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? activeColor : Colors.transparent,
-              width: 1.2,
-            ),
           ),
           child: Icon(
             icon,
-            size: 18,
-            color: isSelected ? activeColor : Colors.white60,
+            size: 19,
+            color: isSelected ? Colors.white : Colors.white70,
           ),
         ),
       ),
