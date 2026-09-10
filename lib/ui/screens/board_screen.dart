@@ -20,7 +20,9 @@ class _BoardScreenState extends State<BoardScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BoardController>();
-    final size = MediaQuery.of(context).size;
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
+    final isMobile = size.width < 600;
 
     // Register active viewport dimensions for accurate preview scaling
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -56,44 +58,46 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 3. Top-Left Slide Drawer Opener Pill
+          // 3. Top-Left Slide Drawer Button
           Positioned(
-            top: 24,
-            left: 20,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: InkWell(
-                  onTap: controller.toggleSlideDrawer,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF141721).withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: controller.isSlideDrawerOpen
-                            ? const Color(0xFF00FFA3)
-                            : Colors.white.withValues(alpha: 0.12),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.layers_rounded, color: Color(0xFF00FFA3), size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          'SLIDES (${controller.currentPageIndex + 1}/${controller.totalPages})',
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Colors.white,
-                          ),
+            top: 18,
+            left: 14,
+            child: SafeArea(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: InkWell(
+                    onTap: controller.toggleSlideDrawer,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141721).withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: controller.isSlideDrawerOpen
+                              ? const Color(0xFF00FFA3)
+                              : Colors.white.withValues(alpha: 0.15),
+                          width: 1.2,
                         ),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.layers_rounded, color: Color(0xFF00FFA3), size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            'SLIDES (${controller.currentPageIndex + 1}/${controller.totalPages})',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -101,11 +105,16 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 4. Centered Floating Toolbar (Animated Hide / Show for Focus Mode)
+          // 4. Responsive Floating Toolbar (Top on Desktop, Bottom on Mobile)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
-            top: controller.isToolbarVisible ? 24 : -100,
+            top: isMobile
+                ? null
+                : (controller.isToolbarVisible ? 18 : -100),
+            bottom: isMobile
+                ? (controller.isToolbarVisible ? 44 : -120)
+                : null,
             left: 0,
             right: 0,
             child: const Center(
@@ -116,34 +125,37 @@ class _BoardScreenState extends State<BoardScreen> {
           // 5. Restore Toolbar Button (Shown when auto-hidden / unpinned)
           if (!controller.isToolbarVisible)
             Positioned(
-              top: 24,
-              right: 20,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: InkWell(
-                    onTap: () => controller.setToolbarVisible(true),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF141721).withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF00FFA3).withValues(alpha: 0.6)),
+              top: isMobile ? null : 18,
+              bottom: isMobile ? 44 : null,
+              right: 14,
+              child: SafeArea(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    child: InkWell(
+                      onTap: () => controller.setToolbarVisible(true),
+                      child: Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF141721).withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF00FFA3).withValues(alpha: 0.6)),
+                        ),
+                        child: const Icon(Icons.tune_rounded, color: Color(0xFF00FFA3), size: 20),
                       ),
-                      child: const Icon(Icons.tune_rounded, color: Color(0xFF00FFA3), size: 20),
                     ),
                   ),
                 ),
               ),
             ),
 
-          // 6. Telemetry Status Bar
+          // 6. Cyber Telemetry HUD (Compact on Mobile)
           Positioned(
-            bottom: 16,
-            left: 20,
+            bottom: isMobile ? 8 : 16,
+            left: 14,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFF141721).withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(8),
@@ -151,15 +163,17 @@ class _BoardScreenState extends State<BoardScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.bolt, size: 14, color: Color(0xFF00FFA3)),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.bolt, size: 12, color: Color(0xFF00FFA3)),
+                  const SizedBox(width: 4),
                   Text(
-                    'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • PINNED: ${controller.isToolbarPinned ? "YES" : "AUTO-HIDE"} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
+                    isMobile
+                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages}'
+                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • PINNED: ${controller.isToolbarPinned ? "YES" : "AUTO-HIDE"} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
                     style: const TextStyle(
                       fontFamily: 'monospace',
-                      fontSize: 11,
+                      fontSize: 10,
                       color: Color(0xFF00FFA3),
-                      letterSpacing: 0.8,
+                      letterSpacing: 0.6,
                     ),
                   ),
                 ],
@@ -167,11 +181,21 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 7. Left Slide Drawer
+          // 7. Left Slide Drawer Backdrop (Tap outside to close)
+          if (controller.isSlideDrawerOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: controller.closeSlideDrawer,
+                child: Container(color: Colors.black45),
+              ),
+            ),
+
+          // 8. Slide Drawer
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
-            left: controller.isSlideDrawerOpen ? 0 : -260,
+            left: controller.isSlideDrawerOpen ? 0 : -270,
             top: 0,
             bottom: 0,
             child: const SlideDrawer(),
