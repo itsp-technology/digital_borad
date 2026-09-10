@@ -7,22 +7,29 @@ import '../core/utils/curve_math.dart';
 class BoardPainter extends CustomPainter {
   final List<Stroke> strokes;
   final Stroke? activeStroke;
+  final List<Offset> laserTrail;
 
   BoardPainter({
     required this.strokes,
     this.activeStroke,
+    this.laserTrail = const [],
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Paint confirmed strokes
+    // 1. Draw static strokes
     for (final stroke in strokes) {
       _paintStroke(canvas, stroke);
     }
 
-    // 2. Paint current active stroke with prediction
+    // 2. Draw live stroke
     if (activeStroke != null && activeStroke!.points.isNotEmpty) {
-      _paintActiveStrokeWithPrediction(canvas, activeStroke!);
+      _paintActiveStroke(canvas, activeStroke!);
+    }
+
+    // 3. Draw dynamic laser pointer
+    if (laserTrail.isNotEmpty) {
+      _paintLaserTrail(canvas, laserTrail);
     }
   }
 
@@ -38,37 +45,29 @@ class BoardPainter extends CustomPainter {
 
     if (stroke.tool == ToolType.highlighter) {
       paint.blendMode = BlendMode.screen;
-    } else {
-      paint.blendMode = BlendMode.srcOver;
     }
 
-    // Neon Outer Halo for futuristic feel (skip for eraser)
-    if (stroke.tool == ToolType.pen && stroke.color != const Color(0xFF1E1E1E)) {
+    // Outer neon bloom for pens on dark surface
+    if (stroke.tool == ToolType.pen && stroke.color != const Color(0xFF0D1117)) {
       final glowPaint = Paint()
-        ..color = stroke.color.withOpacity(0.25)
+        ..color = stroke.color.withValues(alpha: 0.22)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..strokeWidth = stroke.strokeWidth * 2.2
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
       _drawSmoothPath(canvas, stroke.points.map((p) => p.offset).toList(), glowPaint);
     }
 
     _drawSmoothPath(canvas, stroke.points.map((p) => p.offset).toList(), paint);
   }
 
-  void _paintActiveStrokeWithPrediction(Canvas canvas, Stroke stroke) {
+  void _paintActiveStroke(Canvas canvas, Stroke stroke) {
     final points = stroke.points.map((p) => p.offset).toList();
-
-    // Latency eliminator: Predict where stylus will land next based on velocity vector
     if (points.length >= 2) {
       final pLast = points.last;
       final pPrev = points[points.length - 2];
-      final delta = pLast - pPrev;
-
-      // Predict 1.2x ahead of current trajectory
-      final predictedPoint = pLast + (delta * 1.2);
-      points.add(predictedPoint);
+      points.add(pLast + ((pLast - pPrev) * 1.2)); // Velocity forward prediction
     }
 
     final paint = Paint()
@@ -85,33 +84,49 @@ class BoardPainter extends CustomPainter {
     _drawSmoothPath(canvas, points, paint);
   }
 
+  void _paintLaserTrail(Canvas canvas, List<Offset> points) {
+    if (points.length < 2) return;
+
+    final laserGlow = Paint()
+      ..color = const Color(0xFFFF0055).withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 12.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
+
+    final laserCore = Paint()
+      ..color = const Color(0xFFFFFFFF)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3.5;
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+
+    canvas.drawPath(path, laserGlow);
+    canvas.drawPath(path, laserCore);
+    canvas.drawCircle(points.last, 6.0, Paint()..color = const Color(0xFFFF0055));
+  }
+
   void _drawSmoothPath(Canvas canvas, List<Offset> offsets, Paint paint) {
     if (offsets.length == 1) {
       canvas.drawCircle(offsets[0], paint.strokeWidth / 2.0, paint..style = PaintingStyle.fill);
       return;
     }
 
-    final path = Path();
-    path.moveTo(offsets[0].dx, offsets[0].dy);
-
+    final path = Path()..moveTo(offsets[0].dx, offsets[0].dy);
     if (offsets.length == 2) {
       path.lineTo(offsets[1].dx, offsets[1].dy);
     } else {
-      path.lineTo(
-        (offsets[0].dx + offsets[1].dx) / 2.0,
-        (offsets[0].dy + offsets[1].dy) / 2.0,
-      );
-
+      path.lineTo((offsets[0].dx + offsets[1].dx) / 2, (offsets[0].dy + offsets[1].dy) / 2);
       for (int i = 1; i < offsets.length - 1; i++) {
-        final current = offsets[i];
-        final next = offsets[i + 1];
-        final mid = CurveMath.computeMidpoint(current, next);
-        path.quadraticBezierTo(current.dx, current.dy, mid.dx, mid.dy);
+        final mid = CurveMath.computeMidpoint(offsets[i], offsets[i + 1]);
+        path.quadraticBezierTo(offsets[i].dx, offsets[i].dy, mid.dx, mid.dy);
       }
-
       path.lineTo(offsets.last.dx, offsets.last.dy);
     }
-
     canvas.drawPath(path, paint);
   }
 

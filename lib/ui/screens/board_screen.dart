@@ -23,10 +23,10 @@ class _BoardScreenState extends State<BoardScreen> {
       backgroundColor: const Color(0xFF0D1117),
       body: Stack(
         children: [
-          // 1. Futuristic Vector Dot Grid
-          const GridBackground(),
+          // 1. Dynamic background grid
+          GridBackground(mode: controller.themeMode),
 
-          // 2. High-speed Inking Surface
+          // 2. Main low-latency inking canvas
           Listener(
             behavior: HitTestBehavior.opaque,
             onPointerDown: (e) {
@@ -42,35 +42,42 @@ class _BoardScreenState extends State<BoardScreen> {
               painter: BoardPainter(
                 strokes: controller.strokes,
                 activeStroke: controller.activeStroke,
+                laserTrail: controller.laserTrail,
               ),
               size: Size.infinite,
             ),
           ),
 
-          // 3. Cyber HUD Telemetry (Shows current stylus coordinates & latency tracker)
+          // 3. Cyber Telemetry Status Bar
           Positioned(
             bottom: 16,
             left: 20,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black45,
+                color: const Color(0xFF141721).withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(color: Colors.white10),
               ),
-              child: Text(
-                'X: ${_cursorPos.dx.toInt()} | Y: ${_cursorPos.dy.toInt()}  •  ENGINE: GPU-IMPELLER',
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  color: Color(0xFF00FFA3),
-                  letterSpacing: 1.1,
-                ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bolt, size: 14, color: Color(0xFF00FFA3)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'NovaSlate • LATENCY: ~0ms • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()}) • MODE: ${controller.themeMode.name.toUpperCase()}',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: Color(0xFF00FFA3),
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
 
-          // 4. Centered Frosted Glass Tool Dock
+          // 4. Centered Floating Acrylic Dock
           const Positioned(
             top: 24,
             left: 0,

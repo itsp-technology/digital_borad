@@ -14,63 +14,73 @@ class FloatingToolbar extends StatelessWidget {
     final controller = context.watch<BoardController>();
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16.0, sigmaY: 16.0),
+        filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF14171F).withOpacity(0.70),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.12),
-              width: 1.2,
-            ),
+            color: const Color(0xFF121620).withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 25,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ToolButton(
+              _ToolIcon(
                 icon: Icons.edit_rounded,
-                label: 'Pen',
                 activeColor: const Color(0xFF00FFA3),
                 isSelected: controller.currentTool == ToolType.pen,
                 onTap: () => controller.setTool(ToolType.pen),
+                tooltip: 'Cyber Pen',
               ),
               const SizedBox(width: 4),
-              _ToolButton(
+              _ToolIcon(
                 icon: Icons.brush_rounded,
-                label: 'Highlight',
                 activeColor: const Color(0xFFFFE600),
                 isSelected: controller.currentTool == ToolType.highlighter,
                 onTap: () => controller.setTool(ToolType.highlighter),
+                tooltip: 'Highlighter',
               ),
               const SizedBox(width: 4),
-              _ToolButton(
+              _ToolIcon(
+                icon: Icons.flare_rounded,
+                activeColor: const Color(0xFFFF0055),
+                isSelected: controller.currentTool == ToolType.laser,
+                onTap: () => controller.setTool(ToolType.laser),
+                tooltip: 'Laser Pointer',
+              ),
+              const SizedBox(width: 4),
+              _ToolIcon(
                 icon: Icons.auto_fix_high_rounded,
-                label: 'Eraser',
-                activeColor: const Color(0xFFFF3366),
+                activeColor: Colors.blueAccent,
                 isSelected: controller.currentTool == ToolType.eraser,
                 onTap: () => controller.setTool(ToolType.eraser),
+                tooltip: 'Eraser',
               ),
-              const _GlassDivider(),
+              _buildDivider(),
               ColorPalette(
                 selectedColor: controller.selectedColor,
                 onColorSelected: controller.setColor,
               ),
-              const _GlassDivider(),
+              _buildDivider(),
               StrokeSlider(
                 strokeWidth: controller.strokeWidth,
                 onChanged: controller.setStrokeWidth,
               ),
-              const _GlassDivider(),
+              _buildDivider(),
+              IconButton(
+                tooltip: 'Change Background Theme',
+                icon: const Icon(Icons.grid_4x4_rounded, size: 20, color: Colors.white70),
+                onPressed: controller.toggleTheme,
+              ),
               IconButton(
                 tooltip: 'Undo',
                 icon: const Icon(Icons.undo_rounded, size: 20, color: Colors.white70),
@@ -82,8 +92,8 @@ class FloatingToolbar extends StatelessWidget {
                 onPressed: controller.canRedo ? controller.redo : null,
               ),
               IconButton(
-                tooltip: 'Purge Canvas',
-                icon: const Icon(Icons.delete_sweep_rounded, size: 20, color: Color(0xFFFF5252)),
+                tooltip: 'Wipe Clean',
+                icon: const Icon(Icons.delete_sweep_rounded, size: 20, color: Color(0xFFFF4545)),
                 onPressed: controller.clearCanvas,
               ),
             ],
@@ -92,58 +102,56 @@ class FloatingToolbar extends StatelessWidget {
       ),
     );
   }
-}
 
-class _ToolButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color activeColor;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ToolButton({
-    required this.icon,
-    required this.label,
-    required this.activeColor,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? activeColor.withOpacity(0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? activeColor : Colors.transparent,
-            width: 1.2,
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: isSelected ? activeColor : Colors.white60,
-        ),
-      ),
+  static Widget _buildDivider() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      height: 24,
+      width: 1.0,
+      color: Colors.white12,
     );
   }
 }
 
-class _GlassDivider extends StatelessWidget {
-  const _GlassDivider();
+class _ToolIcon extends StatelessWidget {
+  final IconData icon;
+  final Color activeColor;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _ToolIcon({
+    required this.icon,
+    required this.activeColor,
+    required this.isSelected,
+    required this.onTap,
+    required this.tooltip,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      height: 24,
-      width: 1.2,
-      color: Colors.white.withOpacity(0.1),
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor.withValues(alpha: 0.18) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? activeColor : Colors.transparent,
+              width: 1.2,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isSelected ? activeColor : Colors.white60,
+          ),
+        ),
+      ),
     );
   }
 }
