@@ -1,8 +1,11 @@
 {
-  "name": "digital-borad",
+  "name": "digital-board",
+  "main": "src/index.js",
   "compatibility_date": "2024-09-23",
   "assets": {
     "directory": "./build/web",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "html_handling": "single-page-application",
+    "not_found_handling": "single-page-application"
   }
 }
