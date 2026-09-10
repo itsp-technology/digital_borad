@@ -1,5 +1,5 @@
 {
-  "name": "digital-board",
+  "name": "digital_board",
   "compatibility_date": "2024-09-23",
   "assets": {
     "directory": "./build/web",
