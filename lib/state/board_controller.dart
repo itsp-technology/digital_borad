@@ -42,6 +42,7 @@ class BoardController extends ChangeNotifier {
   BoardThemeMode _themeMode = BoardThemeMode.dots;
 
   Size _screenSize = const Size(1920, 1080);
+  int? _selectedStrokeIndex;
 
   BoardController() {
     _loadFromLocalStorage();
@@ -65,10 +66,15 @@ class BoardController extends ChangeNotifier {
   bool get isToolbarVisible => _isToolbarVisible;
   bool get palmRejectionEnabled => _palmRejectionEnabled;
   Size get screenSize => _screenSize;
+  int? get selectedStrokeIndex => _selectedStrokeIndex;
+  Stroke? get selectedStroke =>
+      (_selectedStrokeIndex != null && _selectedStrokeIndex! < _pages[_currentPageIndex].length)
+          ? _pages[_currentPageIndex][_selectedStrokeIndex!]
+          : null;
   bool get canUndo => _pages[_currentPageIndex].isNotEmpty || _pageImages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
 
-  // Persistent Storage Loader (Strokes + Images/PDFs)
+  // Local Storage
   Future<void> _loadFromLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -120,25 +126,117 @@ class BoardController extends ChangeNotifier {
 
   void _scheduleAutoSave() {
     _debounceSaveTimer?.cancel();
-    _debounceSaveTimer = Timer(const Duration(milliseconds: 600), () async {
+    _debounceSaveTimer = Timer(const Duration(milliseconds: 500), () async {
       try {
         final prefs = await SharedPreferences.getInstance();
-
-        // 1. Save Strokes
         final serializedStrokes = _pages.map((p) => p.map((s) => s.toMap()).toList()).toList();
         await prefs.setString(_storageStrokesKey, jsonEncode(serializedStrokes));
 
-        // 2. Save Images
         final serializedImages = _pageImages.map((p) => p.map((i) => i.toMap()).toList()).toList();
         await prefs.setString(_storageImagesKey, jsonEncode(serializedImages));
 
-        // 3. Save Active Index
         await prefs.setInt(_pageIndexKey, _currentPageIndex);
       } catch (_) {}
     });
   }
 
-  // File Import Logic: PDF & Multi-Image
+  // Stroke Selection, Movement & Resizing (Touch & Mouse)
+  void selectStrokeAt(Offset position) {
+    final currentStrokes = _pages[_currentPageIndex];
+    int? foundIndex;
+
+    for (int i = currentStrokes.length - 1; i >= 0; i--) {
+      if (currentStrokes[i].containsOffset(position)) {
+        foundIndex = i;
+        break;
+      }
+    }
+
+    _deselectAllStrokes();
+    if (foundIndex != null) {
+      currentStrokes[foundIndex].isSelected = true;
+      _selectedStrokeIndex = foundIndex;
+      deselectAllImages();
+    }
+    notifyListeners();
+  }
+
+  void moveSelectedStroke(Offset delta) {
+    if (_selectedStrokeIndex != null &&
+        _selectedStrokeIndex! < _pages[_currentPageIndex].length) {
+      _pages[_currentPageIndex][_selectedStrokeIndex!].translate(delta);
+      _scheduleAutoSave();
+      notifyListeners();
+    }
+  }
+
+  void resizeSelectedStroke(double deltaWidth, double deltaHeight) {
+    if (_selectedStrokeIndex != null &&
+        _selectedStrokeIndex! < _pages[_currentPageIndex].length) {
+      _pages[_currentPageIndex][_selectedStrokeIndex!].scale(deltaWidth, deltaHeight);
+      _scheduleAutoSave();
+      notifyListeners();
+    }
+  }
+
+  void deleteSelectedStroke() {
+    if (_selectedStrokeIndex != null &&
+        _selectedStrokeIndex! < _pages[_currentPageIndex].length) {
+      _redoStack.add(_pages[_currentPageIndex].removeAt(_selectedStrokeIndex!));
+      _selectedStrokeIndex = null;
+      _scheduleAutoSave();
+      notifyListeners();
+    }
+  }
+
+  void _deselectAllStrokes() {
+    for (final s in _pages[_currentPageIndex]) {
+      s.isSelected = false;
+    }
+    _selectedStrokeIndex = null;
+  }
+
+  // Image Transformations
+  void selectImage(int index) {
+    _deselectAllStrokes();
+    for (int i = 0; i < _pageImages[_currentPageIndex].length; i++) {
+      _pageImages[_currentPageIndex][i].isSelected = (i == index);
+    }
+    notifyListeners();
+  }
+
+  void deselectAllImages() {
+    for (final img in _pageImages[_currentPageIndex]) {
+      img.isSelected = false;
+    }
+    notifyListeners();
+  }
+
+  void updateImagePosition(int index, Offset delta) {
+    if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
+      _pageImages[_currentPageIndex][index].position += delta;
+      _scheduleAutoSave();
+      notifyListeners();
+    }
+  }
+
+  void updateImageSize(int index, double deltaWidth, double deltaHeight) {
+    if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
+      final img = _pageImages[_currentPageIndex][index];
+      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 3.0);
+      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 3.0);
+      _scheduleAutoSave();
+      notifyListeners();
+    }
+  }
+
+  void deleteSelectedImage() {
+    _pageImages[_currentPageIndex].removeWhere((img) => img.isSelected);
+    _scheduleAutoSave();
+    notifyListeners();
+  }
+
+  // File Import Logic
   Future<void> importMedia() async {
     final uploadInput = web.document.createElement('input') as web.HTMLInputElement;
     uploadInput.type = 'file';
@@ -209,51 +307,8 @@ class BoardController extends ChangeNotifier {
       isSelected: true,
     );
 
-    _currentTool = ToolType.select; // Switch to select tool so image can immediately be transformed
+    _currentTool = ToolType.select;
     _pageImages[_currentPageIndex].add(newImage);
-    _scheduleAutoSave();
-    notifyListeners();
-  }
-
-  // Image Transformations
-  void selectImage(int index) {
-    for (int i = 0; i < _pageImages[_currentPageIndex].length; i++) {
-      _pageImages[_currentPageIndex][i].isSelected = (i == index);
-    }
-    notifyListeners();
-  }
-
-  void deselectAllImages() {
-    bool changed = false;
-    for (final img in _pageImages[_currentPageIndex]) {
-      if (img.isSelected) {
-        img.isSelected = false;
-        changed = true;
-      }
-    }
-    if (changed) notifyListeners();
-  }
-
-  void updateImagePosition(int index, Offset delta) {
-    if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
-      _pageImages[_currentPageIndex][index].position += delta;
-      _scheduleAutoSave();
-      notifyListeners();
-    }
-  }
-
-  void updateImageSize(int index, double deltaWidth, double deltaHeight) {
-    if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
-      final img = _pageImages[_currentPageIndex][index];
-      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 3.0);
-      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 3.0);
-      _scheduleAutoSave();
-      notifyListeners();
-    }
-  }
-
-  void deleteSelectedImage() {
-    _pageImages[_currentPageIndex].removeWhere((img) => img.isSelected);
     _scheduleAutoSave();
     notifyListeners();
   }
@@ -303,6 +358,7 @@ class BoardController extends ChangeNotifier {
     _currentTool = tool;
     if (tool != ToolType.select) {
       deselectAllImages();
+      _deselectAllStrokes();
     }
     onToolSelected();
     notifyListeners();
@@ -331,6 +387,7 @@ class BoardController extends ChangeNotifier {
     _currentPageIndex = _pages.length - 1;
     _redoStack.clear();
     _activeStroke = null;
+    _deselectAllStrokes();
     _scheduleAutoSave();
     notifyListeners();
   }
@@ -340,6 +397,7 @@ class BoardController extends ChangeNotifier {
       _currentPageIndex = index;
       _redoStack.clear();
       _activeStroke = null;
+      _deselectAllStrokes();
       _scheduleAutoSave();
       notifyListeners();
     }
@@ -360,6 +418,7 @@ class BoardController extends ChangeNotifier {
     }
     _redoStack.clear();
     _activeStroke = null;
+    _deselectAllStrokes();
     _scheduleAutoSave();
     notifyListeners();
   }
@@ -374,6 +433,7 @@ class BoardController extends ChangeNotifier {
     }
     _redoStack.clear();
     _activeStroke = null;
+    _deselectAllStrokes();
     _scheduleAutoSave();
     notifyListeners();
   }
@@ -383,13 +443,20 @@ class BoardController extends ChangeNotifier {
       _currentPageIndex--;
       _redoStack.clear();
       _activeStroke = null;
+      _deselectAllStrokes();
       _scheduleAutoSave();
       notifyListeners();
     }
   }
 
   void startStroke(Offset position, double pressure, [ui.PointerDeviceKind? kind]) {
-    if (_currentTool == ToolType.select) return; // Do not draw when transform mode is selected
+    // In Select Mode: taps select strokes/images with touch or stylus
+    if (_currentTool == ToolType.select) {
+      selectStrokeAt(position);
+      return;
+    }
+
+    // In Drawing Mode: Palm rejection only isolates finger touches while actively inking
     if (_palmRejectionEnabled && kind == ui.PointerDeviceKind.touch) return;
 
     if (_currentTool == ToolType.laser) {
@@ -481,11 +548,11 @@ class BoardController extends ChangeNotifier {
   void undo() {
     if (_pages[_currentPageIndex].isNotEmpty) {
       _redoStack.add(_pages[_currentPageIndex].removeLast());
+      _deselectAllStrokes();
       _scheduleAutoSave();
       notifyListeners();
     } else if (_pageImages[_currentPageIndex].isNotEmpty) {
       _pageImages[_currentPageIndex].removeLast();
-      _scheduleAutoSave();
       notifyListeners();
     }
   }
@@ -493,6 +560,7 @@ class BoardController extends ChangeNotifier {
   void redo() {
     if (_redoStack.isNotEmpty) {
       _pages[_currentPageIndex].add(_redoStack.removeLast());
+      _deselectAllStrokes();
       _scheduleAutoSave();
       notifyListeners();
     }
@@ -504,6 +572,7 @@ class BoardController extends ChangeNotifier {
     _redoStack.clear();
     _activeStroke = null;
     _laserTrail.clear();
+    _deselectAllStrokes();
     _scheduleAutoSave();
     notifyListeners();
   }

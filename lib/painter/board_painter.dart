@@ -56,7 +56,7 @@ class BoardPainter extends CustomPainter {
       paint.blendMode = BlendMode.screen;
     }
 
-    // Geometric Shape Rendering
+    // Geometric Shapes
     if (stroke.points.length >= 2) {
       final start = stroke.points.first.offset;
       final end = stroke.points.last.offset;
@@ -64,24 +64,28 @@ class BoardPainter extends CustomPainter {
       switch (stroke.tool) {
         case ToolType.line:
           canvas.drawLine(start, end, paint);
+          _drawSelectionGlow(canvas, stroke);
           return;
         case ToolType.arrow:
           _drawArrow(canvas, start, end, paint);
+          _drawSelectionGlow(canvas, stroke);
           return;
         case ToolType.rectangle:
           final rect = Rect.fromPoints(start, end);
           canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(6)), paint);
+          _drawSelectionGlow(canvas, stroke);
           return;
         case ToolType.circle:
           final rect = Rect.fromPoints(start, end);
           canvas.drawOval(rect, paint);
+          _drawSelectionGlow(canvas, stroke);
           return;
         default:
           break;
       }
     }
 
-    // Neon Outer Halo for Pens on dark surface
+    // Pen outer glow
     if (stroke.tool == ToolType.pen && stroke.color != const Color(0xFF0D1117)) {
       final glowPaint = Paint()
         ..color = stroke.color.withValues(alpha: 0.22)
@@ -94,11 +98,30 @@ class BoardPainter extends CustomPainter {
     }
 
     _drawSmoothPath(canvas, stroke.points.map((p) => p.offset).toList(), paint);
+    _drawSelectionGlow(canvas, stroke);
+  }
+
+  void _drawSelectionGlow(Canvas canvas, Stroke stroke) {
+    if (!stroke.isSelected) return;
+
+    final box = stroke.boundingBox;
+    final rrect = RRect.fromRectAndRadius(box, const Radius.circular(10));
+
+    final selectPaint = Paint()
+      ..color = const Color(0xFF00FFA3).withValues(alpha: 0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+
+    final fillPaint = Paint()
+      ..color = const Color(0xFF00FFA3).withValues(alpha: 0.06)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawRRect(rrect, fillPaint);
+    canvas.drawRRect(rrect, selectPaint);
   }
 
   void _drawArrow(Canvas canvas, Offset start, Offset end, Paint paint) {
     canvas.drawLine(start, end, paint);
-
     const double arrowSize = 14.0;
     const double arrowAngle = 25 * math.pi / 180;
     final double angle = math.atan2(end.dy - start.dy, end.dx - start.dx);

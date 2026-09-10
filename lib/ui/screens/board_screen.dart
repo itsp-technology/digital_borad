@@ -69,18 +69,19 @@ class _BoardScreenState extends State<BoardScreen> {
     });
 
     final bool isSelectMode = controller.currentTool == ToolType.select;
+    final selectedStroke = controller.selectedStroke;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
       body: Stack(
         children: [
-          // 1. Interactive Canvas Surface
+          // 1. Exportable Board Canvas
           RepaintBoundary(
             key: _canvasKey,
             child: InteractiveViewer(
               transformationController: _transformController,
-              panEnabled: isSelectMode, // Smooth canvas pan in select mode
-              scaleEnabled: isSelectMode, // 2-finger zoom in select mode
+              panEnabled: false,
+              scaleEnabled: isSelectMode && selectedStroke == null,
               minScale: 0.5,
               maxScale: 4.0,
               child: Stack(
@@ -88,7 +89,7 @@ class _BoardScreenState extends State<BoardScreen> {
                 children: [
                   GridBackground(mode: controller.themeMode),
 
-                  // Resizable and Movable Images
+                  // Resizable & Movable Images
                   ...controller.currentImages.asMap().entries.map(
                         (entry) => InteractiveImageWidget(
                           image: entry.value,
@@ -96,11 +97,21 @@ class _BoardScreenState extends State<BoardScreen> {
                         ),
                       ),
 
-                  // High-Performance Inking Layer
-                  IgnorePointer(
-                    ignoring: isSelectMode, // In select mode, pass all gestures directly to images
+                  // Drawing Canvas & Stroke Gesture Layer
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) {
+                      if (isSelectMode) {
+                        controller.selectStrokeAt(details.localPosition);
+                      }
+                    },
+                    onPanUpdate: (details) {
+                      if (isSelectMode && selectedStroke != null) {
+                        controller.moveSelectedStroke(details.delta);
+                      }
+                    },
                     child: Listener(
-                      behavior: HitTestBehavior.opaque,
+                      behavior: HitTestBehavior.translucent,
                       onPointerDown: (e) {
                         setState(() => _cursorPos = e.localPosition);
                         controller.startStroke(e.localPosition, e.pressure, e.kind);
@@ -120,6 +131,60 @@ class _BoardScreenState extends State<BoardScreen> {
                       ),
                     ),
                   ),
+
+                  // Selected Drawing: Touchscreen Corner Resize Handle (Bottom-Right)
+                  if (isSelectMode && selectedStroke != null)
+                    Positioned(
+                      left: selectedStroke.boundingBox.right - 14,
+                      top: selectedStroke.boundingBox.bottom - 14,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanUpdate: (details) {
+                          controller.resizeSelectedStroke(details.delta.dx, details.delta.dy);
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00FFA3),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.black, width: 2.5),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black54, blurRadius: 6),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.aspect_ratio_rounded,
+                            size: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Selected Drawing: Delete Button (Top-Right)
+                  if (isSelectMode && selectedStroke != null)
+                    Positioned(
+                      left: selectedStroke.boundingBox.right - 14,
+                      top: selectedStroke.boundingBox.top - 18,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: controller.deleteSelectedStroke,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF3366),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.8),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black54, blurRadius: 6),
+                            ],
+                          ),
+                          child: const Icon(Icons.close_rounded, size: 15, color: Colors.white),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -172,7 +237,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 3. Floating Toolbar (Laptop Top, Mobile Bottom)
+          // 3. Floating Toolbar (Desktop Top, Mobile Bottom)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
