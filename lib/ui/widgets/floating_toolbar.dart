@@ -34,6 +34,23 @@ class FloatingToolbar extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Pin / Stick Toggle Symbol
+              Tooltip(
+                message: controller.isToolbarPinned
+                    ? 'Pinned: Always Visible'
+                    : 'Unpinned: Auto-Hides on Tool Select',
+                child: IconButton(
+                  icon: Icon(
+                    controller.isToolbarPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                    size: 19,
+                    color: controller.isToolbarPinned ? const Color(0xFF00FFA3) : Colors.white38,
+                  ),
+                  onPressed: controller.toggleToolbarPin,
+                ),
+              ),
+              _buildDivider(),
+
+              // Core Inking Tools
               _ToolIcon(
                 icon: Icons.edit_rounded,
                 activeColor: const Color(0xFF00FFA3),
@@ -66,76 +83,29 @@ class FloatingToolbar extends StatelessWidget {
                 tooltip: 'Eraser',
               ),
               _buildDivider(),
+
+              // Color Selection
               ColorPalette(
                 selectedColor: controller.selectedColor,
                 onColorSelected: controller.setColor,
               ),
               _buildDivider(),
+
+              // Stroke Width
               StrokeSlider(
                 strokeWidth: controller.strokeWidth,
                 onChanged: controller.setStrokeWidth,
               ),
               _buildDivider(),
 
-              // Slide Deck Navigation & Drawer Trigger
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 15, color: Colors.white70),
-                    onPressed: controller.currentPageIndex > 0 ? controller.previousPage : null,
-                  ),
-                  InkWell(
-                    onTap: controller.toggleSlideDrawer,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: controller.isSlideDrawerOpen
-                            ? const Color(0xFF00FFA3).withValues(alpha: 0.3)
-                            : const Color(0xFF00FFA3).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFF00FFA3).withValues(alpha: 0.6),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.view_sidebar_rounded, size: 13, color: Color(0xFF00FFA3)),
-                          const SizedBox(width: 5),
-                          Text(
-                            'SLIDE ${controller.currentPageIndex + 1}/${controller.totalPages}',
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF00FFA3),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.white70),
-                    onPressed: controller.currentPageIndex < controller.totalPages - 1
-                        ? controller.nextPage
-                        : null,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline_rounded, size: 18, color: Color(0xFF00FFA3)),
-                    tooltip: 'New Slide (+)',
-                    onPressed: controller.addNewPage,
-                  ),
-                ],
-              ),
-
-              _buildDivider(),
+              // Canvas Background Grid Mode
               IconButton(
-                tooltip: 'Change Background Theme',
+                tooltip: 'Change Background Grid',
                 icon: const Icon(Icons.grid_4x4_rounded, size: 20, color: Colors.white70),
                 onPressed: controller.toggleTheme,
               ),
+
+              // Undo / Redo / Clear
               IconButton(
                 tooltip: 'Undo',
                 icon: const Icon(Icons.undo_rounded, size: 20, color: Colors.white70),
@@ -147,7 +117,7 @@ class FloatingToolbar extends StatelessWidget {
                 onPressed: controller.canRedo ? controller.redo : null,
               ),
               IconButton(
-                tooltip: 'Wipe Slide',
+                tooltip: 'Wipe Current Slide',
                 icon: const Icon(Icons.delete_sweep_rounded, size: 20, color: Color(0xFFFF4545)),
                 onPressed: controller.clearCanvas,
               ),
@@ -160,7 +130,7 @@ class FloatingToolbar extends StatelessWidget {
 
   static Widget _buildDivider() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       height: 24,
       width: 1.0,
       color: Colors.white12,

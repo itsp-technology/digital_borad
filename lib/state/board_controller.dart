@@ -11,6 +11,10 @@ class BoardController extends ChangeNotifier {
   int _currentPageIndex = 0;
   bool _isSlideDrawerOpen = false;
 
+  // Toolbar stick / auto-hide feature
+  bool _isToolbarPinned = true;
+  bool _isToolbarVisible = true;
+
   final List<Stroke> _redoStack = [];
   Stroke? _activeStroke;
   List<Offset> _laserTrail = [];
@@ -20,6 +24,9 @@ class BoardController extends ChangeNotifier {
   Color _selectedColor = const Color(0xFF00FFA3);
   double _strokeWidth = 4.0;
   BoardThemeMode _themeMode = BoardThemeMode.dots;
+
+  // Canvas dimensions for scaling thumbnail previews
+  Size _screenSize = const Size(1920, 1080);
 
   // Getters
   List<Stroke> get strokes => List.unmodifiable(_pages[_currentPageIndex]);
@@ -33,8 +40,35 @@ class BoardController extends ChangeNotifier {
   int get currentPageIndex => _currentPageIndex;
   int get totalPages => _pages.length;
   bool get isSlideDrawerOpen => _isSlideDrawerOpen;
+  bool get isToolbarPinned => _isToolbarPinned;
+  bool get isToolbarVisible => _isToolbarVisible;
+  Size get screenSize => _screenSize;
   bool get canUndo => _pages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
+
+  void updateScreenSize(Size size) {
+    if (_screenSize != size && size.width > 0 && size.height > 0) {
+      _screenSize = size;
+      notifyListeners();
+    }
+  }
+
+  void toggleToolbarPin() {
+    _isToolbarPinned = !_isToolbarPinned;
+    notifyListeners();
+  }
+
+  void setToolbarVisible(bool visible) {
+    _isToolbarVisible = visible;
+    notifyListeners();
+  }
+
+  void onToolSelected() {
+    if (!_isToolbarPinned) {
+      _isToolbarVisible = false;
+      notifyListeners();
+    }
+  }
 
   void toggleSlideDrawer() {
     _isSlideDrawerOpen = !_isSlideDrawerOpen;
@@ -50,11 +84,13 @@ class BoardController extends ChangeNotifier {
 
   void setTool(ToolType tool) {
     _currentTool = tool;
+    onToolSelected();
     notifyListeners();
   }
 
   void setColor(Color color) {
     _selectedColor = color;
+    onToolSelected();
     notifyListeners();
   }
 
@@ -69,7 +105,6 @@ class BoardController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Slide Management
   void addNewPage() {
     _pages.add([]);
     _currentPageIndex = _pages.length - 1;

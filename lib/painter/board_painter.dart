@@ -8,28 +8,36 @@ class BoardPainter extends CustomPainter {
   final List<Stroke> strokes;
   final Stroke? activeStroke;
   final List<Offset> laserTrail;
+  final double scale;
 
   BoardPainter({
     required this.strokes,
     this.activeStroke,
     this.laserTrail = const [],
+    this.scale = 1.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw static strokes
+    if (scale != 1.0) {
+      canvas.save();
+      canvas.scale(scale, scale);
+    }
+
     for (final stroke in strokes) {
       _paintStroke(canvas, stroke);
     }
 
-    // 2. Draw live stroke
     if (activeStroke != null && activeStroke!.points.isNotEmpty) {
       _paintActiveStroke(canvas, activeStroke!);
     }
 
-    // 3. Draw dynamic laser pointer
     if (laserTrail.isNotEmpty) {
       _paintLaserTrail(canvas, laserTrail);
+    }
+
+    if (scale != 1.0) {
+      canvas.restore();
     }
   }
 
@@ -47,7 +55,6 @@ class BoardPainter extends CustomPainter {
       paint.blendMode = BlendMode.screen;
     }
 
-    // Outer neon bloom for pens on dark surface
     if (stroke.tool == ToolType.pen && stroke.color != const Color(0xFF0D1117)) {
       final glowPaint = Paint()
         ..color = stroke.color.withValues(alpha: 0.22)
@@ -67,7 +74,7 @@ class BoardPainter extends CustomPainter {
     if (points.length >= 2) {
       final pLast = points.last;
       final pPrev = points[points.length - 2];
-      points.add(pLast + ((pLast - pPrev) * 1.2)); // Velocity forward prediction
+      points.add(pLast + ((pLast - pPrev) * 1.2));
     }
 
     final paint = Paint()
