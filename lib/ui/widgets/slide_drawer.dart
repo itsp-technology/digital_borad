@@ -10,6 +10,8 @@ class SlideDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<BoardController>();
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final drawerWidth = isMobile ? MediaQuery.of(context).size.width * 0.85 : 250.0;
     final screenSize = controller.screenSize;
 
     return ClipRRect(
@@ -20,9 +22,9 @@ class SlideDrawer extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20.0, sigmaY: 20.0),
         child: Container(
-          width: 250,
+          width: drawerWidth,
           decoration: BoxDecoration(
-            color: const Color(0xFF10131C).withValues(alpha: 0.90),
+            color: const Color(0xFF10131C).withValues(alpha: 0.92),
             border: Border(
               right: BorderSide(
                 color: Colors.white.withValues(alpha: 0.12),
@@ -88,7 +90,7 @@ class SlideDrawer extends StatelessWidget {
                 ),
               ),
 
-              // Slide List
+              // Individual Slide Thumbnails
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -96,9 +98,9 @@ class SlideDrawer extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final isSelected = index == controller.currentPageIndex;
                     final slideStrokes = controller.allPages[index];
-                    final slideImages = controller.currentImages;
+                    final slideImages = controller.allPageImages[index];
 
-                    const double previewWidth = 226.0;
+                    final double previewWidth = drawerWidth - 24;
                     const double previewHeight = 125.0;
                     final double scaleX = previewWidth / (screenSize.width > 0 ? screenSize.width : 1920);
                     final double scaleY = previewHeight / (screenSize.height > 0 ? screenSize.height : 1080);
@@ -125,7 +127,10 @@ class SlideDrawer extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
-                          onTap: () => controller.goToPage(index),
+                          onTap: () {
+                            controller.goToPage(index);
+                            if (isMobile) controller.closeSlideDrawer();
+                          },
                           child: Stack(
                             children: [
                               Container(
@@ -135,19 +140,21 @@ class SlideDrawer extends StatelessWidget {
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    if (slideImages.isNotEmpty)
-                                      Positioned(
-                                        left: slideImages.first.position.dx * previewScale,
-                                        top: slideImages.first.position.dy * previewScale,
-                                        width: slideImages.first.width * previewScale,
-                                        height: slideImages.first.height * previewScale,
+                                    // Accurate Slide-Specific Images
+                                    ...slideImages.map(
+                                      (img) => Positioned(
+                                        left: img.position.dx * previewScale,
+                                        top: img.position.dy * previewScale,
+                                        width: img.width * previewScale,
+                                        height: img.height * previewScale,
                                         child: Image.memory(
-                                          slideImages.first.bytes,
+                                          img.bytes,
                                           fit: BoxFit.fill,
                                         ),
                                       ),
+                                    ),
                                     CustomPaint(
-                                      size: const Size(previewWidth, previewHeight),
+                                      size: Size(previewWidth, previewHeight),
                                       painter: BoardPainter(
                                         strokes: slideStrokes,
                                         activeStroke: null,
@@ -209,7 +216,7 @@ class SlideDrawer extends StatelessWidget {
                 ),
               ),
 
-              // Bottom Actions: "+ Add Slide" & "Import Media"
+              // Bottom Actions
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(

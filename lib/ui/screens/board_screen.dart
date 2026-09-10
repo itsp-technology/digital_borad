@@ -18,6 +18,7 @@ class BoardScreen extends StatefulWidget {
 
 class _BoardScreenState extends State<BoardScreen> {
   final GlobalKey _canvasKey = GlobalKey();
+  final TransformationController _transformController = TransformationController();
   Offset _cursorPos = Offset.zero;
 
   Future<void> _exportSlide() async {
@@ -50,6 +51,12 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   @override
+  void dispose() {
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final controller = context.watch<BoardController>();
     final mediaQuery = MediaQuery.of(context);
@@ -60,55 +67,66 @@ class _BoardScreenState extends State<BoardScreen> {
       controller.updateScreenSize(size);
     });
 
+    final bool hasSelectedImage = controller.currentImages.any((img) => img.isSelected);
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
       body: Stack(
         children: [
-          // 1. Exportable Canvas Region
+          // 1. Exportable Canvas with Interactive Viewer Support
           RepaintBoundary(
             key: _canvasKey,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Base background pattern
-                GridBackground(mode: controller.themeMode),
+            child: InteractiveViewer(
+              transformationController: _transformController,
+              panEnabled: false, // Inking handles gestures; zoom is available via multi-touch
+              scaleEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  GridBackground(mode: controller.themeMode),
 
-                // Resizable, Zoomable, Movable Images
-                ...controller.currentImages.asMap().entries.map(
-                      (entry) => InteractiveImageWidget(
-                        image: entry.value,
-                        index: entry.key,
+                  // Movable and Resizable Images
+                  ...controller.currentImages.asMap().entries.map(
+                        (entry) => InteractiveImageWidget(
+                          image: entry.value,
+                          index: entry.key,
+                        ),
+                      ),
+
+                  // Inking Surface (Transparent to gestures when selecting/resizing images)
+                  IgnorePointer(
+                    ignoring: hasSelectedImage,
+                    child: Listener(
+                      behavior: HitTestBehavior.opaque,
+                      onPointerDown: (e) {
+                        setState(() => _cursorPos = e.localPosition);
+                        controller.startStroke(e.localPosition, e.pressure, e.kind);
+                      },
+                      onPointerMove: (e) {
+                        setState(() => _cursorPos = e.localPosition);
+                        controller.appendPoint(e.localPosition, e.pressure, e.kind);
+                      },
+                      onPointerUp: (_) => controller.endStroke(),
+                      child: CustomPaint(
+                        painter: BoardPainter(
+                          strokes: controller.strokes,
+                          activeStroke: controller.activeStroke,
+                          laserTrail: controller.laserTrail,
+                        ),
+                        size: Size.infinite,
                       ),
                     ),
-
-                // High-performance Inking Layer
-                Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: (e) {
-                    setState(() => _cursorPos = e.localPosition);
-                    controller.startStroke(e.localPosition, e.pressure, e.kind);
-                  },
-                  onPointerMove: (e) {
-                    setState(() => _cursorPos = e.localPosition);
-                    controller.appendPoint(e.localPosition, e.pressure, e.kind);
-                  },
-                  onPointerUp: (_) => controller.endStroke(),
-                  child: CustomPaint(
-                    painter: BoardPainter(
-                      strokes: controller.strokes,
-                      activeStroke: controller.activeStroke,
-                      laserTrail: controller.laserTrail,
-                    ),
-                    size: Size.infinite,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
           // 2. Top-Left Slide Drawer Button
           Positioned(
-            top: 18,
+            top: isMobile ? 12 : 18,
             left: 14,
             child: SafeArea(
               child: ClipRRect(
@@ -158,7 +176,7 @@ class _BoardScreenState extends State<BoardScreen> {
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
             top: isMobile ? null : (controller.isToolbarVisible ? 18 : -100),
-            bottom: isMobile ? (controller.isToolbarVisible ? 44 : -120) : null,
+            bottom: isMobile ? (controller.isToolbarVisible ? 38 : -120) : null,
             left: 0,
             right: 0,
             child: Center(
@@ -166,11 +184,11 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 4. Restore Toolbar Button (Shown when auto-hidden)
+          // 4. Restore Hidden Toolbar Button
           if (!controller.isToolbarVisible)
             Positioned(
               top: isMobile ? null : 18,
-              bottom: isMobile ? 44 : null,
+              bottom: isMobile ? 38 : null,
               right: 14,
               child: SafeArea(
                 child: ClipRRect(
@@ -196,7 +214,7 @@ class _BoardScreenState extends State<BoardScreen> {
 
           // 5. Telemetry Status Bar
           Positioned(
-            bottom: isMobile ? 8 : 16,
+            bottom: isMobile ? 6 : 16,
             left: 14,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -211,8 +229,8 @@ class _BoardScreenState extends State<BoardScreen> {
                   const SizedBox(width: 4),
                   Text(
                     isMobile
-                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages} • PALM: ${controller.palmRejectionEnabled ? "ON" : "OFF"}'
-                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • PALM: ${controller.palmRejectionEnabled ? "ISOLATED" : "TOUCH"} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
+                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages}'
+                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 10,
@@ -225,7 +243,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 6. Left Slide Drawer Backdrop & Drawer
+          // 6. Slide Drawer Backdrop & Animated Drawer
           if (controller.isSlideDrawerOpen)
             Positioned.fill(
               child: GestureDetector(
@@ -237,7 +255,7 @@ class _BoardScreenState extends State<BoardScreen> {
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
-            left: controller.isSlideDrawerOpen ? 0 : -270,
+            left: controller.isSlideDrawerOpen ? 0.0 : -(isMobile ? size.width : 270.0),
             top: 0,
             bottom: 0,
             child: const SlideDrawer(),

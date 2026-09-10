@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/board_image.dart';
 import '../../state/board_controller.dart';
 
-class InteractiveImageWidget extends StatelessWidget {
+class InteractiveImageWidget extends StatefulWidget {
   final BoardImage image;
   final int index;
 
@@ -14,84 +14,102 @@ class InteractiveImageWidget extends StatelessWidget {
   });
 
   @override
+  State<InteractiveImageWidget> createState() => _InteractiveImageWidgetState();
+}
+
+class _InteractiveImageWidgetState extends State<InteractiveImageWidget> {
+  @override
   Widget build(BuildContext context) {
     final controller = context.read<BoardController>();
 
     return Positioned(
-      left: image.position.dx,
-      top: image.position.dy,
+      left: widget.image.position.dx,
+      top: widget.image.position.dy,
       child: GestureDetector(
-        onTap: () => controller.selectImage(index),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => controller.selectImage(widget.index),
         onPanUpdate: (details) {
-          if (image.isSelected) {
-            controller.updateImagePosition(index, details.delta);
+          if (widget.image.isSelected) {
+            controller.updateImagePosition(widget.index, details.delta);
           }
         },
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: image.width,
-              height: image.height,
+              width: widget.image.width,
+              height: widget.image.height,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: image.isSelected ? const Color(0xFF00FFA3) : Colors.transparent,
+                  color: widget.image.isSelected ? const Color(0xFF00FFA3) : Colors.transparent,
                   width: 2.0,
                 ),
-                boxShadow: image.isSelected
+                boxShadow: widget.image.isSelected
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF00FFA3).withValues(alpha: 0.3),
-                          blurRadius: 15,
+                          color: const Color(0xFF00FFA3).withValues(alpha: 0.35),
+                          blurRadius: 18,
                         ),
                       ]
                     : [],
               ),
               child: Image.memory(
-                image.bytes,
+                widget.image.bytes,
                 fit: BoxFit.fill,
                 filterQuality: FilterQuality.medium,
               ),
             ),
 
-            // Resize & Zoom Handle (Bottom-Right)
-            if (image.isSelected)
+            // Resize & Scale Handle (Bottom-Right)
+            if (widget.image.isSelected)
               Positioned(
-                right: -12,
-                bottom: -12,
+                right: -16,
+                bottom: -16,
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onPanUpdate: (details) {
-                    controller.updateImageSize(index, details.delta.dx, details.delta.dy);
+                    controller.updateImageSize(
+                      widget.index,
+                      details.delta.dx,
+                      details.delta.dy,
+                    );
                   },
                   child: Container(
-                    width: 26,
-                    height: 26,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: const Color(0xFF00FFA3),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 2),
+                      border: Border.all(color: Colors.black, width: 2.5),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black45, blurRadius: 4),
+                      ],
                     ),
-                    child: const Icon(Icons.aspect_ratio_rounded, size: 14, color: Colors.black),
+                    child: const Icon(Icons.aspect_ratio_rounded, size: 16, color: Colors.black),
                   ),
                 ),
               ),
 
             // Delete Image Button (Top-Right)
-            if (image.isSelected)
+            if (widget.image.isSelected)
               Positioned(
-                right: -12,
-                top: -12,
+                right: -16,
+                top: -16,
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: controller.deleteSelectedImage,
                   child: Container(
-                    width: 26,
-                    height: 26,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF4545),
+                      color: const Color(0xFFFF3366),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black45, blurRadius: 4),
+                      ],
                     ),
-                    child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                    child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
                   ),
                 ),
               ),

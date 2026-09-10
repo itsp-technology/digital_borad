@@ -50,6 +50,7 @@ class BoardController extends ChangeNotifier {
   List<Stroke> get strokes => List.unmodifiable(_pages[_currentPageIndex]);
   List<List<Stroke>> get allPages => List.unmodifiable(_pages);
   List<BoardImage> get currentImages => _pageImages[_currentPageIndex];
+  List<List<BoardImage>> get allPageImages => List.unmodifiable(_pageImages);
   Stroke? get activeStroke => _activeStroke;
   List<Offset> get laserTrail => List.unmodifiable(_laserTrail);
   ToolType get currentTool => _currentTool;
@@ -66,7 +67,6 @@ class BoardController extends ChangeNotifier {
   bool get canUndo => _pages[_currentPageIndex].isNotEmpty || _pageImages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
 
-  // LocalStorage Sync
   Future<void> _loadFromLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -112,7 +112,6 @@ class BoardController extends ChangeNotifier {
     });
   }
 
-  // Native Browser Media Import (PDF & Multi-Image)
   Future<void> importMedia() async {
     final uploadInput = web.document.createElement('input') as web.HTMLInputElement;
     uploadInput.type = 'file';
@@ -169,8 +168,8 @@ class BoardController extends ChangeNotifier {
   }
 
   void _addImageToCurrentSlide(Uint8List bytes, {bool autoFit = false}) {
-    double initialWidth = autoFit ? (_screenSize.width * 0.75).clamp(320, 1100) : 380;
-    double initialHeight = autoFit ? (_screenSize.height * 0.8).clamp(240, 800) : 260;
+    final double initialWidth = autoFit ? (_screenSize.width * 0.85).clamp(320.0, 1400.0) : 380.0;
+    final double initialHeight = autoFit ? (_screenSize.height * 0.88).clamp(240.0, 900.0) : 260.0;
 
     final newImage = BoardImage(
       bytes: bytes,
@@ -187,7 +186,6 @@ class BoardController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Image Transformations
   void selectImage(int index) {
     for (int i = 0; i < _pageImages[_currentPageIndex].length; i++) {
       _pageImages[_currentPageIndex][i].isSelected = (i == index);
@@ -216,8 +214,8 @@ class BoardController extends ChangeNotifier {
   void updateImageSize(int index, double deltaWidth, double deltaHeight) {
     if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
       final img = _pageImages[_currentPageIndex][index];
-      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 1.5);
-      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 1.5);
+      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 2.5);
+      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 2.5);
       notifyListeners();
     }
   }
