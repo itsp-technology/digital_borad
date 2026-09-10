@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
+import '../../models/tool_type.dart';
 import '../../painter/board_painter.dart';
 import '../../state/board_controller.dart';
 import '../widgets/floating_toolbar.dart';
@@ -67,19 +68,19 @@ class _BoardScreenState extends State<BoardScreen> {
       controller.updateScreenSize(size);
     });
 
-    final bool hasSelectedImage = controller.currentImages.any((img) => img.isSelected);
+    final bool isSelectMode = controller.currentTool == ToolType.select;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
       body: Stack(
         children: [
-          // 1. Exportable Canvas with Interactive Viewer Support
+          // 1. Interactive Canvas Surface
           RepaintBoundary(
             key: _canvasKey,
             child: InteractiveViewer(
               transformationController: _transformController,
-              panEnabled: false, // Inking handles gestures; zoom is available via multi-touch
-              scaleEnabled: true,
+              panEnabled: isSelectMode, // Smooth canvas pan in select mode
+              scaleEnabled: isSelectMode, // 2-finger zoom in select mode
               minScale: 0.5,
               maxScale: 4.0,
               child: Stack(
@@ -87,7 +88,7 @@ class _BoardScreenState extends State<BoardScreen> {
                 children: [
                   GridBackground(mode: controller.themeMode),
 
-                  // Movable and Resizable Images
+                  // Resizable and Movable Images
                   ...controller.currentImages.asMap().entries.map(
                         (entry) => InteractiveImageWidget(
                           image: entry.value,
@@ -95,9 +96,9 @@ class _BoardScreenState extends State<BoardScreen> {
                         ),
                       ),
 
-                  // Inking Surface (Transparent to gestures when selecting/resizing images)
+                  // High-Performance Inking Layer
                   IgnorePointer(
-                    ignoring: hasSelectedImage,
+                    ignoring: isSelectMode, // In select mode, pass all gestures directly to images
                     child: Listener(
                       behavior: HitTestBehavior.opaque,
                       onPointerDown: (e) {
@@ -184,7 +185,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 4. Restore Hidden Toolbar Button
+          // 4. Restore Toolbar Button (Shown when auto-hidden)
           if (!controller.isToolbarVisible)
             Positioned(
               top: isMobile ? null : 18,
@@ -229,8 +230,8 @@ class _BoardScreenState extends State<BoardScreen> {
                   const SizedBox(width: 4),
                   Text(
                     isMobile
-                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages}'
-                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
+                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages} • ${controller.currentTool.name.toUpperCase()}'
+                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • MODE: ${controller.currentTool.name.toUpperCase()} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 10,
@@ -256,8 +257,8 @@ class _BoardScreenState extends State<BoardScreen> {
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
             left: controller.isSlideDrawerOpen ? 0.0 : -(isMobile ? size.width : 270.0),
-            top: 0,
-            bottom: 0,
+            top: 0.0,
+            bottom: 0.0,
             child: const SlideDrawer(),
           ),
         ],

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
@@ -17,16 +18,18 @@ class BoardImage {
   });
 
   Map<String, dynamic> toMap() => {
+        'b64': base64Encode(bytes),
         'x': position.dx,
         'y': position.dy,
         'w': width,
         'h': height,
       };
 
-  factory BoardImage.fromMap(Map<String, dynamic> map, Uint8List bytes) => BoardImage(
-        bytes: bytes,
+  factory BoardImage.fromMap(Map<String, dynamic> map) => BoardImage(
+        bytes: base64Decode(map['b64'] as String),
         position: Offset((map['x'] as num).toDouble(), (map['y'] as num).toDouble()),
         width: (map['w'] as num).toDouble(),
         height: (map['h'] as num).toDouble(),
+        isSelected: false,
       );
 }

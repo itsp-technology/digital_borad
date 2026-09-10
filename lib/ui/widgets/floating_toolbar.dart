@@ -23,7 +23,7 @@ class FloatingToolbar extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: isMobile ? MediaQuery.of(context).size.width - 16 : 1120,
+              maxWidth: isMobile ? MediaQuery.of(context).size.width - 16 : 1180,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -64,7 +64,17 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // Inking Tools
+                  // Select / Move & Scale Images/PDFs
+                  _ToolIcon(
+                    icon: Icons.pan_tool_alt_rounded,
+                    activeColor: const Color(0xFF00E5FF),
+                    isSelected: controller.currentTool == ToolType.select,
+                    onTap: () => controller.setTool(ToolType.select),
+                    tooltip: 'Select / Move & Resize Image',
+                  ),
+                  const SizedBox(width: 3),
+
+                  // Freehand Tools
                   _ToolIcon(
                     icon: Icons.edit_rounded,
                     activeColor: const Color(0xFF00FFA3),

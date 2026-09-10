@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/board_image.dart';
+import '../../models/tool_type.dart';
 import '../../state/board_controller.dart';
 
 class InteractiveImageWidget extends StatefulWidget {
@@ -20,16 +21,21 @@ class InteractiveImageWidget extends StatefulWidget {
 class _InteractiveImageWidgetState extends State<InteractiveImageWidget> {
   @override
   Widget build(BuildContext context) {
-    final controller = context.read<BoardController>();
+    final controller = context.watch<BoardController>();
+    final isSelectMode = controller.currentTool == ToolType.select;
 
     return Positioned(
       left: widget.image.position.dx,
       top: widget.image.position.dy,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => controller.selectImage(widget.index),
+        onTap: () {
+          if (isSelectMode) {
+            controller.selectImage(widget.index);
+          }
+        },
         onPanUpdate: (details) {
-          if (widget.image.isSelected) {
+          if (isSelectMode && widget.image.isSelected) {
             controller.updateImagePosition(widget.index, details.delta);
           }
         },
@@ -41,10 +47,12 @@ class _InteractiveImageWidgetState extends State<InteractiveImageWidget> {
               height: widget.image.height,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: widget.image.isSelected ? const Color(0xFF00FFA3) : Colors.transparent,
+                  color: (widget.image.isSelected && isSelectMode)
+                      ? const Color(0xFF00FFA3)
+                      : Colors.transparent,
                   width: 2.0,
                 ),
-                boxShadow: widget.image.isSelected
+                boxShadow: (widget.image.isSelected && isSelectMode)
                     ? [
                         BoxShadow(
                           color: const Color(0xFF00FFA3).withValues(alpha: 0.35),
@@ -61,7 +69,7 @@ class _InteractiveImageWidgetState extends State<InteractiveImageWidget> {
             ),
 
             // Resize & Scale Handle (Bottom-Right)
-            if (widget.image.isSelected)
+            if (widget.image.isSelected && isSelectMode)
               Positioned(
                 right: -16,
                 bottom: -16,
@@ -91,7 +99,7 @@ class _InteractiveImageWidgetState extends State<InteractiveImageWidget> {
               ),
 
             // Delete Image Button (Top-Right)
-            if (widget.image.isSelected)
+            if (widget.image.isSelected && isSelectMode)
               Positioned(
                 right: -16,
                 top: -16,

@@ -17,8 +17,9 @@ external JSPromise<JSArray<JSString>> renderPdfToImages(JSArrayBuffer buffer);
 enum BoardThemeMode { grid, dots, lines, blank }
 
 class BoardController extends ChangeNotifier {
-  static const String _storageKey = 'novaslate_slides_v1';
-  static const String _pageIndexKey = 'novaslate_active_page_v1';
+  static const String _storageStrokesKey = 'novaslate_strokes_v2';
+  static const String _storageImagesKey = 'novaslate_images_v2';
+  static const String _pageIndexKey = 'novaslate_active_page_v2';
 
   final List<List<Stroke>> _pages = [[]];
   final List<List<BoardImage>> _pageImages = [[]];
@@ -67,26 +68,43 @@ class BoardController extends ChangeNotifier {
   bool get canUndo => _pages[_currentPageIndex].isNotEmpty || _pageImages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
 
+  // Persistent Storage Loader (Strokes + Images/PDFs)
   Future<void> _loadFromLocalStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedData = prefs.getString(_storageKey);
+      final strokesData = prefs.getString(_storageStrokesKey);
+      final imagesData = prefs.getString(_storageImagesKey);
       final savedIndex = prefs.getInt(_pageIndexKey) ?? 0;
 
-      if (savedData != null && savedData.isNotEmpty) {
-        final List<dynamic> decodedPages = jsonDecode(savedData);
-        final loaded = decodedPages.map((page) {
-          final List<dynamic> strokeList = page as List<dynamic>;
-          return strokeList.map((s) => Stroke.fromMap(s as Map<String, dynamic>)).toList();
+      if (strokesData != null && strokesData.isNotEmpty) {
+        final List<dynamic> decodedPages = jsonDecode(strokesData);
+        final loadedStrokes = decodedPages.map((page) {
+          final List<dynamic> sList = page as List<dynamic>;
+          return sList.map((s) => Stroke.fromMap(s as Map<String, dynamic>)).toList();
         }).toList();
 
-        if (loaded.isNotEmpty) {
+        List<List<BoardImage>> loadedImages = [];
+        if (imagesData != null && imagesData.isNotEmpty) {
+          final List<dynamic> decodedImgPages = jsonDecode(imagesData);
+          loadedImages = decodedImgPages.map((page) {
+            final List<dynamic> imgList = page as List<dynamic>;
+            return imgList.map((i) => BoardImage.fromMap(i as Map<String, dynamic>)).toList();
+          }).toList();
+        }
+
+        if (loadedStrokes.isNotEmpty) {
           _pages.clear();
           _pageImages.clear();
-          for (final strokeList in loaded) {
-            _pages.add(strokeList);
-            _pageImages.add([]);
+
+          for (int i = 0; i < loadedStrokes.length; i++) {
+            _pages.add(loadedStrokes[i]);
+            if (i < loadedImages.length) {
+              _pageImages.add(loadedImages[i]);
+            } else {
+              _pageImages.add([]);
+            }
           }
+
           _currentPageIndex = (savedIndex < _pages.length) ? savedIndex : 0;
           notifyListeners();
         }
@@ -102,16 +120,25 @@ class BoardController extends ChangeNotifier {
 
   void _scheduleAutoSave() {
     _debounceSaveTimer?.cancel();
-    _debounceSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+    _debounceSaveTimer = Timer(const Duration(milliseconds: 600), () async {
       try {
         final prefs = await SharedPreferences.getInstance();
-        final serialized = _pages.map((page) => page.map((s) => s.toMap()).toList()).toList();
-        await prefs.setString(_storageKey, jsonEncode(serialized));
+
+        // 1. Save Strokes
+        final serializedStrokes = _pages.map((p) => p.map((s) => s.toMap()).toList()).toList();
+        await prefs.setString(_storageStrokesKey, jsonEncode(serializedStrokes));
+
+        // 2. Save Images
+        final serializedImages = _pageImages.map((p) => p.map((i) => i.toMap()).toList()).toList();
+        await prefs.setString(_storageImagesKey, jsonEncode(serializedImages));
+
+        // 3. Save Active Index
         await prefs.setInt(_pageIndexKey, _currentPageIndex);
       } catch (_) {}
     });
   }
 
+  // File Import Logic: PDF & Multi-Image
   Future<void> importMedia() async {
     final uploadInput = web.document.createElement('input') as web.HTMLInputElement;
     uploadInput.type = 'file';
@@ -179,13 +206,16 @@ class BoardController extends ChangeNotifier {
       ),
       width: initialWidth,
       height: initialHeight,
-      isSelected: !autoFit,
+      isSelected: true,
     );
 
+    _currentTool = ToolType.select; // Switch to select tool so image can immediately be transformed
     _pageImages[_currentPageIndex].add(newImage);
+    _scheduleAutoSave();
     notifyListeners();
   }
 
+  // Image Transformations
   void selectImage(int index) {
     for (int i = 0; i < _pageImages[_currentPageIndex].length; i++) {
       _pageImages[_currentPageIndex][i].isSelected = (i == index);
@@ -207,6 +237,7 @@ class BoardController extends ChangeNotifier {
   void updateImagePosition(int index, Offset delta) {
     if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
       _pageImages[_currentPageIndex][index].position += delta;
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
@@ -214,14 +245,16 @@ class BoardController extends ChangeNotifier {
   void updateImageSize(int index, double deltaWidth, double deltaHeight) {
     if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
       final img = _pageImages[_currentPageIndex][index];
-      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 2.5);
-      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 2.5);
+      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 3.0);
+      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 3.0);
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
 
   void deleteSelectedImage() {
     _pageImages[_currentPageIndex].removeWhere((img) => img.isSelected);
+    _scheduleAutoSave();
     notifyListeners();
   }
 
@@ -268,7 +301,9 @@ class BoardController extends ChangeNotifier {
 
   void setTool(ToolType tool) {
     _currentTool = tool;
-    deselectAllImages();
+    if (tool != ToolType.select) {
+      deselectAllImages();
+    }
     onToolSelected();
     notifyListeners();
   }
@@ -354,6 +389,7 @@ class BoardController extends ChangeNotifier {
   }
 
   void startStroke(Offset position, double pressure, [ui.PointerDeviceKind? kind]) {
+    if (_currentTool == ToolType.select) return; // Do not draw when transform mode is selected
     if (_palmRejectionEnabled && kind == ui.PointerDeviceKind.touch) return;
 
     if (_currentTool == ToolType.laser) {
@@ -386,6 +422,7 @@ class BoardController extends ChangeNotifier {
   }
 
   void appendPoint(Offset position, double pressure, [ui.PointerDeviceKind? kind]) {
+    if (_currentTool == ToolType.select) return;
     if (_palmRejectionEnabled && kind == ui.PointerDeviceKind.touch) return;
 
     if (_currentTool == ToolType.laser) {
@@ -418,6 +455,8 @@ class BoardController extends ChangeNotifier {
   }
 
   void endStroke() {
+    if (_currentTool == ToolType.select) return;
+
     if (_currentTool == ToolType.laser) {
       _laserTimer?.cancel();
       _laserTimer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
@@ -446,6 +485,7 @@ class BoardController extends ChangeNotifier {
       notifyListeners();
     } else if (_pageImages[_currentPageIndex].isNotEmpty) {
       _pageImages[_currentPageIndex].removeLast();
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
