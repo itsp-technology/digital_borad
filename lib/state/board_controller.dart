@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/stroke.dart';
 import '../models/stroke_point.dart';
 import '../models/tool_type.dart';
@@ -8,7 +10,10 @@ import '../models/tool_type.dart';
 enum BoardThemeMode { grid, dots, lines, blank }
 
 class BoardController extends ChangeNotifier {
-  final List<List<Stroke>> _pages = [[]];
+  static const String _storageKey = 'novaslate_slides_v1';
+  static const String _pageIndexKey = 'novaslate_active_page_v1';
+
+  List<List<Stroke>> _pages = [[]];
   int _currentPageIndex = 0;
   bool _isSlideDrawerOpen = false;
 
@@ -20,6 +25,7 @@ class BoardController extends ChangeNotifier {
   Stroke? _activeStroke;
   List<Offset> _laserTrail = [];
   Timer? _laserTimer;
+  Timer? _debounceSaveTimer;
 
   ToolType _currentTool = ToolType.pen;
   Color _selectedColor = const Color(0xFF00FFA3);
@@ -27,6 +33,10 @@ class BoardController extends ChangeNotifier {
   BoardThemeMode _themeMode = BoardThemeMode.dots;
 
   Size _screenSize = const Size(1920, 1080);
+
+  BoardController() {
+    _loadFromLocalStorage();
+  }
 
   // Getters
   List<Stroke> get strokes => List.unmodifiable(_pages[_currentPageIndex]);
@@ -46,6 +56,46 @@ class BoardController extends ChangeNotifier {
   Size get screenSize => _screenSize;
   bool get canUndo => _pages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
+
+  // LocalStorage Sync
+  Future<void> _loadFromLocalStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedData = prefs.getString(_storageKey);
+      final savedIndex = prefs.getInt(_pageIndexKey) ?? 0;
+
+      if (savedData != null && savedData.isNotEmpty) {
+        final List<dynamic> decodedPages = jsonDecode(savedData);
+        final loaded = decodedPages.map((page) {
+          final List<dynamic> strokeList = page as List<dynamic>;
+          return strokeList
+              .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
+              .toList();
+        }).toList();
+
+        if (loaded.isNotEmpty) {
+          _pages = loaded;
+          _currentPageIndex = (savedIndex < _pages.length) ? savedIndex : 0;
+          notifyListeners();
+        }
+      }
+    } catch (_) {
+      _pages = [[]];
+      _currentPageIndex = 0;
+    }
+  }
+
+  void _scheduleAutoSave() {
+    _debounceSaveTimer?.cancel();
+    _debounceSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final serialized = _pages.map((page) => page.map((s) => s.toMap()).toList()).toList();
+        await prefs.setString(_storageKey, jsonEncode(serialized));
+        await prefs.setInt(_pageIndexKey, _currentPageIndex);
+      } catch (_) {}
+    });
+  }
 
   void updateScreenSize(Size size) {
     if (_screenSize != size && size.width > 0 && size.height > 0) {
@@ -116,6 +166,7 @@ class BoardController extends ChangeNotifier {
     _currentPageIndex = _pages.length - 1;
     _redoStack.clear();
     _activeStroke = null;
+    _scheduleAutoSave();
     notifyListeners();
   }
 
@@ -124,6 +175,7 @@ class BoardController extends ChangeNotifier {
       _currentPageIndex = index;
       _redoStack.clear();
       _activeStroke = null;
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
@@ -141,6 +193,7 @@ class BoardController extends ChangeNotifier {
     }
     _redoStack.clear();
     _activeStroke = null;
+    _scheduleAutoSave();
     notifyListeners();
   }
 
@@ -153,6 +206,7 @@ class BoardController extends ChangeNotifier {
     }
     _redoStack.clear();
     _activeStroke = null;
+    _scheduleAutoSave();
     notifyListeners();
   }
 
@@ -161,13 +215,14 @@ class BoardController extends ChangeNotifier {
       _currentPageIndex--;
       _redoStack.clear();
       _activeStroke = null;
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
 
   void startStroke(Offset position, double pressure, [PointerDeviceKind? kind]) {
     if (_palmRejectionEnabled && kind == PointerDeviceKind.touch) {
-      return; // Ignore finger touches if stylus isolation is active
+      return;
     }
 
     if (_currentTool == ToolType.laser) {
@@ -183,7 +238,7 @@ class BoardController extends ChangeNotifier {
     double effectiveWidth = _strokeWidth;
 
     if (_currentTool == ToolType.highlighter) {
-      strokeColor = _selectedColor.withOpacity(0.35);
+      strokeColor = _selectedColor.withValues(alpha: 0.35);
       effectiveWidth = _strokeWidth * 3.5;
     } else if (_currentTool == ToolType.eraser) {
       strokeColor = const Color(0xFF0D1117);
@@ -212,7 +267,6 @@ class BoardController extends ChangeNotifier {
     if (_activeStroke == null) return;
     final effectivePressure = pressure > 0 ? pressure : 0.5;
 
-    // Geometric shape handling: start point anchored at 0, current drag at 1
     if (_isGeometricTool(_currentTool)) {
       if (_activeStroke!.points.length == 1) {
         _activeStroke!.points.add(StrokePoint(offset: position, pressure: effectivePressure));
@@ -249,6 +303,7 @@ class BoardController extends ChangeNotifier {
     if (_activeStroke != null) {
       _pages[_currentPageIndex].add(_activeStroke!);
       _activeStroke = null;
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
@@ -256,6 +311,7 @@ class BoardController extends ChangeNotifier {
   void undo() {
     if (_pages[_currentPageIndex].isNotEmpty) {
       _redoStack.add(_pages[_currentPageIndex].removeLast());
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
@@ -263,6 +319,7 @@ class BoardController extends ChangeNotifier {
   void redo() {
     if (_redoStack.isNotEmpty) {
       _pages[_currentPageIndex].add(_redoStack.removeLast());
+      _scheduleAutoSave();
       notifyListeners();
     }
   }
@@ -272,6 +329,7 @@ class BoardController extends ChangeNotifier {
     _redoStack.clear();
     _activeStroke = null;
     _laserTrail.clear();
+    _scheduleAutoSave();
     notifyListeners();
   }
 }
