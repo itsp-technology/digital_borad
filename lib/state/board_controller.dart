@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/stroke.dart';
 import '../models/stroke_point.dart';
@@ -11,9 +12,9 @@ class BoardController extends ChangeNotifier {
   int _currentPageIndex = 0;
   bool _isSlideDrawerOpen = false;
 
-  // Toolbar stick / auto-hide feature
   bool _isToolbarPinned = true;
   bool _isToolbarVisible = true;
+  bool _palmRejectionEnabled = false;
 
   final List<Stroke> _redoStack = [];
   Stroke? _activeStroke;
@@ -25,7 +26,6 @@ class BoardController extends ChangeNotifier {
   double _strokeWidth = 4.0;
   BoardThemeMode _themeMode = BoardThemeMode.dots;
 
-  // Canvas dimensions for scaling thumbnail previews
   Size _screenSize = const Size(1920, 1080);
 
   // Getters
@@ -42,6 +42,7 @@ class BoardController extends ChangeNotifier {
   bool get isSlideDrawerOpen => _isSlideDrawerOpen;
   bool get isToolbarPinned => _isToolbarPinned;
   bool get isToolbarVisible => _isToolbarVisible;
+  bool get palmRejectionEnabled => _palmRejectionEnabled;
   Size get screenSize => _screenSize;
   bool get canUndo => _pages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
@@ -51,6 +52,11 @@ class BoardController extends ChangeNotifier {
       _screenSize = size;
       notifyListeners();
     }
+  }
+
+  void togglePalmRejection() {
+    _palmRejectionEnabled = !_palmRejectionEnabled;
+    notifyListeners();
   }
 
   void toggleToolbarPin() {
@@ -127,7 +133,9 @@ class BoardController extends ChangeNotifier {
       _pages[0].clear();
     } else {
       _pages.removeAt(index);
-      if (_currentPageIndex >= _pages.length) {
+      if (_currentPageIndex > index) {
+        _currentPageIndex--;
+      } else if (_currentPageIndex >= _pages.length) {
         _currentPageIndex = _pages.length - 1;
       }
     }
@@ -157,7 +165,11 @@ class BoardController extends ChangeNotifier {
     }
   }
 
-  void startStroke(Offset position, double pressure) {
+  void startStroke(Offset position, double pressure, [PointerDeviceKind? kind]) {
+    if (_palmRejectionEnabled && kind == PointerDeviceKind.touch) {
+      return; // Ignore finger touches if stylus isolation is active
+    }
+
     if (_currentTool == ToolType.laser) {
       _laserTrail = [position];
       notifyListeners();
@@ -167,22 +179,15 @@ class BoardController extends ChangeNotifier {
     _redoStack.clear();
     final effectivePressure = pressure > 0 ? pressure : 0.5;
 
-    Color strokeColor;
+    Color strokeColor = _selectedColor;
     double effectiveWidth = _strokeWidth;
 
-    switch (_currentTool) {
-      case ToolType.highlighter:
-        strokeColor = _selectedColor.withValues(alpha: 0.35);
-        effectiveWidth = _strokeWidth * 3.5;
-        break;
-      case ToolType.eraser:
-        strokeColor = const Color(0xFF0D1117);
-        effectiveWidth = _strokeWidth * 4.0;
-        break;
-      case ToolType.pen:
-      default:
-        strokeColor = _selectedColor;
-        break;
+    if (_currentTool == ToolType.highlighter) {
+      strokeColor = _selectedColor.withOpacity(0.35);
+      effectiveWidth = _strokeWidth * 3.5;
+    } else if (_currentTool == ToolType.eraser) {
+      strokeColor = const Color(0xFF0D1117);
+      effectiveWidth = _strokeWidth * 4.0;
     }
 
     _activeStroke = Stroke(
@@ -194,7 +199,9 @@ class BoardController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void appendPoint(Offset position, double pressure) {
+  void appendPoint(Offset position, double pressure, [PointerDeviceKind? kind]) {
+    if (_palmRejectionEnabled && kind == PointerDeviceKind.touch) return;
+
     if (_currentTool == ToolType.laser) {
       _laserTrail.add(position);
       if (_laserTrail.length > 25) _laserTrail.removeAt(0);
@@ -204,10 +211,25 @@ class BoardController extends ChangeNotifier {
 
     if (_activeStroke == null) return;
     final effectivePressure = pressure > 0 ? pressure : 0.5;
-    _activeStroke!.points.add(
-      StrokePoint(offset: position, pressure: effectivePressure),
-    );
+
+    // Geometric shape handling: start point anchored at 0, current drag at 1
+    if (_isGeometricTool(_currentTool)) {
+      if (_activeStroke!.points.length == 1) {
+        _activeStroke!.points.add(StrokePoint(offset: position, pressure: effectivePressure));
+      } else {
+        _activeStroke!.points[1] = StrokePoint(offset: position, pressure: effectivePressure);
+      }
+    } else {
+      _activeStroke!.points.add(StrokePoint(offset: position, pressure: effectivePressure));
+    }
     notifyListeners();
+  }
+
+  bool _isGeometricTool(ToolType tool) {
+    return tool == ToolType.line ||
+        tool == ToolType.arrow ||
+        tool == ToolType.rectangle ||
+        tool == ToolType.circle;
   }
 
   void endStroke() {

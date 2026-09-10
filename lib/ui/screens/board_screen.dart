@@ -1,5 +1,6 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../../painter/board_painter.dart';
 import '../../state/board_controller.dart';
@@ -15,7 +16,37 @@ class BoardScreen extends StatefulWidget {
 }
 
 class _BoardScreenState extends State<BoardScreen> {
+  final GlobalKey _canvasKey = GlobalKey();
   Offset _cursorPos = Offset.zero;
+
+  Future<void> _exportSlide() async {
+    try {
+      final boundary = _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF141721),
+            behavior: SnackBarBehavior.floating,
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF00FFA3)),
+                const SizedBox(width: 8),
+                Text(
+                  'Slide ${context.read<BoardController>().currentPageIndex + 1} captured successfully!',
+                  style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +55,6 @@ class _BoardScreenState extends State<BoardScreen> {
     final size = mediaQuery.size;
     final isMobile = size.width < 600;
 
-    // Register active viewport dimensions for accurate preview scaling
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.updateScreenSize(size);
     });
@@ -33,32 +63,37 @@ class _BoardScreenState extends State<BoardScreen> {
       backgroundColor: const Color(0xFF0D1117),
       body: Stack(
         children: [
-          // 1. Grid / Dots / Lines Background
-          GridBackground(mode: controller.themeMode),
-
-          // 2. High-speed Inking Surface
-          Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: (e) {
-              setState(() => _cursorPos = e.localPosition);
-              controller.startStroke(e.localPosition, e.pressure);
-            },
-            onPointerMove: (e) {
-              setState(() => _cursorPos = e.localPosition);
-              controller.appendPoint(e.localPosition, e.pressure);
-            },
-            onPointerUp: (_) => controller.endStroke(),
-            child: CustomPaint(
-              painter: BoardPainter(
-                strokes: controller.strokes,
-                activeStroke: controller.activeStroke,
-                laserTrail: controller.laserTrail,
-              ),
-              size: Size.infinite,
+          // 1. Exportable Canvas Region
+          RepaintBoundary(
+            key: _canvasKey,
+            child: Stack(
+              children: [
+                GridBackground(mode: controller.themeMode),
+                Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (e) {
+                    setState(() => _cursorPos = e.localPosition);
+                    controller.startStroke(e.localPosition, e.pressure, e.kind);
+                  },
+                  onPointerMove: (e) {
+                    setState(() => _cursorPos = e.localPosition);
+                    controller.appendPoint(e.localPosition, e.pressure, e.kind);
+                  },
+                  onPointerUp: (_) => controller.endStroke(),
+                  child: CustomPaint(
+                    painter: BoardPainter(
+                      strokes: controller.strokes,
+                      activeStroke: controller.activeStroke,
+                      laserTrail: controller.laserTrail,
+                    ),
+                    size: Size.infinite,
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // 3. Top-Left Slide Drawer Button
+          // 2. Top-Left Slide Drawer Button
           Positioned(
             top: 18,
             left: 14,
@@ -66,7 +101,7 @@ class _BoardScreenState extends State<BoardScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                   child: InkWell(
                     onTap: controller.toggleSlideDrawer,
                     borderRadius: BorderRadius.circular(16),
@@ -105,24 +140,20 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 4. Responsive Floating Toolbar (Top on Desktop, Bottom on Mobile)
+          // 3. Floating Toolbar (Laptop Top, Mobile Bottom)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
-            top: isMobile
-                ? null
-                : (controller.isToolbarVisible ? 18 : -100),
-            bottom: isMobile
-                ? (controller.isToolbarVisible ? 44 : -120)
-                : null,
+            top: isMobile ? null : (controller.isToolbarVisible ? 18 : -100),
+            bottom: isMobile ? (controller.isToolbarVisible ? 44 : -120) : null,
             left: 0,
             right: 0,
-            child: const Center(
-              child: FloatingToolbar(),
+            child: Center(
+              child: FloatingToolbar(onExport: _exportSlide),
             ),
           ),
 
-          // 5. Restore Toolbar Button (Shown when auto-hidden / unpinned)
+          // 4. Restore Toolbar Button (Shown when auto-hidden)
           if (!controller.isToolbarVisible)
             Positioned(
               top: isMobile ? null : 18,
@@ -132,7 +163,7 @@ class _BoardScreenState extends State<BoardScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                     child: InkWell(
                       onTap: () => controller.setToolbarVisible(true),
                       child: Container(
@@ -150,7 +181,7 @@ class _BoardScreenState extends State<BoardScreen> {
               ),
             ),
 
-          // 6. Cyber Telemetry HUD (Compact on Mobile)
+          // 5. Telemetry Status Bar
           Positioned(
             bottom: isMobile ? 8 : 16,
             left: 14,
@@ -167,8 +198,8 @@ class _BoardScreenState extends State<BoardScreen> {
                   const SizedBox(width: 4),
                   Text(
                     isMobile
-                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages}'
-                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • PINNED: ${controller.isToolbarPinned ? "YES" : "AUTO-HIDE"} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
+                        ? 'P: ${controller.currentPageIndex + 1}/${controller.totalPages} • PALM: ${controller.palmRejectionEnabled ? "ON" : "OFF"}'
+                        : 'NovaSlate • PAGE: ${controller.currentPageIndex + 1}/${controller.totalPages} • PALM: ${controller.palmRejectionEnabled ? "ISOLATED" : "TOUCH"} • POS: (${_cursorPos.dx.toInt()}, ${_cursorPos.dy.toInt()})',
                     style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 10,
@@ -181,7 +212,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
           ),
 
-          // 7. Left Slide Drawer Backdrop (Tap outside to close)
+          // 6. Left Slide Drawer Backdrop & Drawer
           if (controller.isSlideDrawerOpen)
             Positioned.fill(
               child: GestureDetector(
@@ -190,8 +221,6 @@ class _BoardScreenState extends State<BoardScreen> {
                 child: Container(color: Colors.black45),
               ),
             ),
-
-          // 8. Slide Drawer
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,

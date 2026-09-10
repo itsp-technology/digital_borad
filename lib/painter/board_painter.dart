@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/stroke.dart';
@@ -29,7 +30,7 @@ class BoardPainter extends CustomPainter {
     }
 
     if (activeStroke != null && activeStroke!.points.isNotEmpty) {
-      _paintActiveStroke(canvas, activeStroke!);
+      _paintStroke(canvas, activeStroke!);
     }
 
     if (laserTrail.isNotEmpty) {
@@ -55,6 +56,32 @@ class BoardPainter extends CustomPainter {
       paint.blendMode = BlendMode.screen;
     }
 
+    // Geometric Shape Rendering
+    if (stroke.points.length >= 2) {
+      final start = stroke.points.first.offset;
+      final end = stroke.points.last.offset;
+
+      switch (stroke.tool) {
+        case ToolType.line:
+          canvas.drawLine(start, end, paint);
+          return;
+        case ToolType.arrow:
+          _drawArrow(canvas, start, end, paint);
+          return;
+        case ToolType.rectangle:
+          final rect = Rect.fromPoints(start, end);
+          canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(6)), paint);
+          return;
+        case ToolType.circle:
+          final rect = Rect.fromPoints(start, end);
+          canvas.drawOval(rect, paint);
+          return;
+        default:
+          break;
+      }
+    }
+
+    // Neon Outer Halo for Pens on dark surface
     if (stroke.tool == ToolType.pen && stroke.color != const Color(0xFF0D1117)) {
       final glowPaint = Paint()
         ..color = stroke.color.withValues(alpha: 0.22)
@@ -69,26 +96,29 @@ class BoardPainter extends CustomPainter {
     _drawSmoothPath(canvas, stroke.points.map((p) => p.offset).toList(), paint);
   }
 
-  void _paintActiveStroke(Canvas canvas, Stroke stroke) {
-    final points = stroke.points.map((p) => p.offset).toList();
-    if (points.length >= 2) {
-      final pLast = points.last;
-      final pPrev = points[points.length - 2];
-      points.add(pLast + ((pLast - pPrev) * 1.2));
-    }
+  void _drawArrow(Canvas canvas, Offset start, Offset end, Paint paint) {
+    canvas.drawLine(start, end, paint);
 
-    final paint = Paint()
-      ..color = stroke.color
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = stroke.strokeWidth;
+    const double arrowSize = 14.0;
+    const double arrowAngle = 25 * math.pi / 180;
+    final double angle = math.atan2(end.dy - start.dy, end.dx - start.dx);
 
-    if (stroke.tool == ToolType.highlighter) {
-      paint.blendMode = BlendMode.screen;
-    }
+    final arrowP1 = Offset(
+      end.dx - arrowSize * math.cos(angle - arrowAngle),
+      end.dy - arrowSize * math.sin(angle - arrowAngle),
+    );
+    final arrowP2 = Offset(
+      end.dx - arrowSize * math.cos(angle + arrowAngle),
+      end.dy - arrowSize * math.sin(angle + arrowAngle),
+    );
 
-    _drawSmoothPath(canvas, points, paint);
+    final arrowPath = Path()
+      ..moveTo(end.dx, end.dy)
+      ..lineTo(arrowP1.dx, arrowP1.dy)
+      ..moveTo(end.dx, end.dy)
+      ..lineTo(arrowP2.dx, arrowP2.dy);
+
+    canvas.drawPath(arrowPath, paint);
   }
 
   void _paintLaserTrail(Canvas canvas, List<Offset> points) {

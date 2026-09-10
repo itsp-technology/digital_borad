@@ -7,7 +7,8 @@ import 'color_palette.dart';
 import 'stroke_slider.dart';
 
 class FloatingToolbar extends StatelessWidget {
-  const FloatingToolbar({super.key});
+  final VoidCallback onExport;
+  const FloatingToolbar({super.key, required this.onExport});
 
   @override
   Widget build(BuildContext context) {
@@ -15,14 +16,14 @@ class FloatingToolbar extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 0),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 0),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: isMobile ? MediaQuery.of(context).size.width - 24 : 950,
+              maxWidth: isMobile ? MediaQuery.of(context).size.width - 16 : 1050,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -43,31 +44,38 @@ class FloatingToolbar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Pin / Auto-hide Button
-                  Tooltip(
-                    message: controller.isToolbarPinned
-                        ? 'Pinned: Always Visible'
-                        : 'Unpinned: Auto-Hides on Tool Select',
-                    child: IconButton(
-                      icon: Icon(
-                        controller.isToolbarPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                        size: 18,
-                        color: controller.isToolbarPinned ? const Color(0xFF00FFA3) : Colors.white38,
-                      ),
-                      onPressed: controller.toggleToolbarPin,
+                  // 1. Pin Toggle
+                  IconButton(
+                    tooltip: controller.isToolbarPinned ? 'Pinned' : 'Auto-Hides',
+                    icon: Icon(
+                      controller.isToolbarPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                      size: 18,
+                      color: controller.isToolbarPinned ? const Color(0xFF00FFA3) : Colors.white38,
                     ),
+                    onPressed: controller.toggleToolbarPin,
+                  ),
+
+                  // 2. Palm Rejection (Stylus only toggle)
+                  IconButton(
+                    tooltip: controller.palmRejectionEnabled ? 'Stylus Only Mode (Active)' : 'Touch + Stylus',
+                    icon: Icon(
+                      Icons.do_not_touch_rounded,
+                      size: 18,
+                      color: controller.palmRejectionEnabled ? const Color(0xFFFF5252) : Colors.white38,
+                    ),
+                    onPressed: controller.togglePalmRejection,
                   ),
                   _buildDivider(),
 
-                  // Inking Tools
+                  // 3. Freehand Tools
                   _ToolIcon(
                     icon: Icons.edit_rounded,
                     activeColor: const Color(0xFF00FFA3),
                     isSelected: controller.currentTool == ToolType.pen,
                     onTap: () => controller.setTool(ToolType.pen),
-                    tooltip: 'Cyber Pen',
+                    tooltip: 'Pen',
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   _ToolIcon(
                     icon: Icons.brush_rounded,
                     activeColor: const Color(0xFFFFE600),
@@ -75,15 +83,15 @@ class FloatingToolbar extends StatelessWidget {
                     onTap: () => controller.setTool(ToolType.highlighter),
                     tooltip: 'Highlighter',
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   _ToolIcon(
                     icon: Icons.flare_rounded,
                     activeColor: const Color(0xFFFF0055),
                     isSelected: controller.currentTool == ToolType.laser,
                     onTap: () => controller.setTool(ToolType.laser),
-                    tooltip: 'Laser Pointer',
+                    tooltip: 'Laser',
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   _ToolIcon(
                     icon: Icons.auto_fix_high_rounded,
                     activeColor: Colors.blueAccent,
@@ -93,28 +101,63 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // Color Picker
+                  // 4. Geometric Shapes
+                  _ToolIcon(
+                    icon: Icons.horizontal_rule_rounded,
+                    activeColor: const Color(0xFF00E5FF),
+                    isSelected: controller.currentTool == ToolType.line,
+                    onTap: () => controller.setTool(ToolType.line),
+                    tooltip: 'Line',
+                  ),
+                  const SizedBox(width: 3),
+                  _ToolIcon(
+                    icon: Icons.arrow_outward_rounded,
+                    activeColor: const Color(0xFF00E5FF),
+                    isSelected: controller.currentTool == ToolType.arrow,
+                    onTap: () => controller.setTool(ToolType.arrow),
+                    tooltip: 'Arrow',
+                  ),
+                  const SizedBox(width: 3),
+                  _ToolIcon(
+                    icon: Icons.crop_square_rounded,
+                    activeColor: const Color(0xFF00E5FF),
+                    isSelected: controller.currentTool == ToolType.rectangle,
+                    onTap: () => controller.setTool(ToolType.rectangle),
+                    tooltip: 'Rectangle',
+                  ),
+                  const SizedBox(width: 3),
+                  _ToolIcon(
+                    icon: Icons.panorama_fish_eye_rounded,
+                    activeColor: const Color(0xFF00E5FF),
+                    isSelected: controller.currentTool == ToolType.circle,
+                    onTap: () => controller.setTool(ToolType.circle),
+                    tooltip: 'Circle',
+                  ),
+                  _buildDivider(),
+
+                  // 5. Colors & Thickness
                   ColorPalette(
                     selectedColor: controller.selectedColor,
                     onColorSelected: controller.setColor,
                   ),
                   _buildDivider(),
-
-                  // Stroke Width
                   StrokeSlider(
                     strokeWidth: controller.strokeWidth,
                     onChanged: controller.setStrokeWidth,
                   ),
                   _buildDivider(),
 
-                  // Theme Selector
+                  // 6. Theme, Export, Undo, Redo, Wipe
                   IconButton(
-                    tooltip: 'Change Grid Pattern',
+                    tooltip: 'Grid Pattern',
                     icon: const Icon(Icons.grid_4x4_rounded, size: 19, color: Colors.white70),
                     onPressed: controller.toggleTheme,
                   ),
-
-                  // Actions: Undo, Redo, Clear
+                  IconButton(
+                    tooltip: 'Export Slide to Notes',
+                    icon: const Icon(Icons.download_rounded, size: 19, color: Color(0xFF00FFA3)),
+                    onPressed: onExport,
+                  ),
                   IconButton(
                     tooltip: 'Undo',
                     icon: const Icon(Icons.undo_rounded, size: 19, color: Colors.white70),
@@ -126,7 +169,7 @@ class FloatingToolbar extends StatelessWidget {
                     onPressed: controller.canRedo ? controller.redo : null,
                   ),
                   IconButton(
-                    tooltip: 'Wipe Slide',
+                    tooltip: 'Wipe Clean',
                     icon: const Icon(Icons.delete_sweep_rounded, size: 19, color: Color(0xFFFF4545)),
                     onPressed: controller.clearCanvas,
                   ),
@@ -141,7 +184,7 @@ class FloatingToolbar extends StatelessWidget {
 
   static Widget _buildDivider() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 5),
       height: 22,
       width: 1.0,
       color: Colors.white12,
@@ -175,7 +218,7 @@ class _ToolIcon extends StatelessWidget {
           padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
             color: isSelected ? activeColor.withValues(alpha: 0.18) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSelected ? activeColor : Colors.transparent,
               width: 1.2,

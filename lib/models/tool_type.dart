@@ -3,4 +3,8 @@ enum ToolType {
   highlighter,
   laser,
   eraser,
+  line,
+  arrow,
+  rectangle,
+  circle,
 }
