@@ -1,11 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
+import 'dart:js_interop';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web/web.dart' as web;
+import '../models/board_image.dart';
 import '../models/stroke.dart';
 import '../models/stroke_point.dart';
 import '../models/tool_type.dart';
+
+@JS('renderPdfToImages')
+external JSPromise<JSArray<JSString>> renderPdfToImages(JSArrayBuffer buffer);
 
 enum BoardThemeMode { grid, dots, lines, blank }
 
@@ -13,7 +20,8 @@ class BoardController extends ChangeNotifier {
   static const String _storageKey = 'novaslate_slides_v1';
   static const String _pageIndexKey = 'novaslate_active_page_v1';
 
-  List<List<Stroke>> _pages = [[]];
+  final List<List<Stroke>> _pages = [[]];
+  final List<List<BoardImage>> _pageImages = [[]];
   int _currentPageIndex = 0;
   bool _isSlideDrawerOpen = false;
 
@@ -41,6 +49,7 @@ class BoardController extends ChangeNotifier {
   // Getters
   List<Stroke> get strokes => List.unmodifiable(_pages[_currentPageIndex]);
   List<List<Stroke>> get allPages => List.unmodifiable(_pages);
+  List<BoardImage> get currentImages => _pageImages[_currentPageIndex];
   Stroke? get activeStroke => _activeStroke;
   List<Offset> get laserTrail => List.unmodifiable(_laserTrail);
   ToolType get currentTool => _currentTool;
@@ -54,7 +63,7 @@ class BoardController extends ChangeNotifier {
   bool get isToolbarVisible => _isToolbarVisible;
   bool get palmRejectionEnabled => _palmRejectionEnabled;
   Size get screenSize => _screenSize;
-  bool get canUndo => _pages[_currentPageIndex].isNotEmpty;
+  bool get canUndo => _pages[_currentPageIndex].isNotEmpty || _pageImages[_currentPageIndex].isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
 
   // LocalStorage Sync
@@ -68,19 +77,25 @@ class BoardController extends ChangeNotifier {
         final List<dynamic> decodedPages = jsonDecode(savedData);
         final loaded = decodedPages.map((page) {
           final List<dynamic> strokeList = page as List<dynamic>;
-          return strokeList
-              .map((s) => Stroke.fromMap(s as Map<String, dynamic>))
-              .toList();
+          return strokeList.map((s) => Stroke.fromMap(s as Map<String, dynamic>)).toList();
         }).toList();
 
         if (loaded.isNotEmpty) {
-          _pages = loaded;
+          _pages.clear();
+          _pageImages.clear();
+          for (final strokeList in loaded) {
+            _pages.add(strokeList);
+            _pageImages.add([]);
+          }
           _currentPageIndex = (savedIndex < _pages.length) ? savedIndex : 0;
           notifyListeners();
         }
       }
     } catch (_) {
-      _pages = [[]];
+      _pages.clear();
+      _pages.add([]);
+      _pageImages.clear();
+      _pageImages.add([]);
       _currentPageIndex = 0;
     }
   }
@@ -95,6 +110,121 @@ class BoardController extends ChangeNotifier {
         await prefs.setInt(_pageIndexKey, _currentPageIndex);
       } catch (_) {}
     });
+  }
+
+  // Native Browser Media Import (PDF & Multi-Image)
+  Future<void> importMedia() async {
+    final uploadInput = web.document.createElement('input') as web.HTMLInputElement;
+    uploadInput.type = 'file';
+    uploadInput.accept = '.pdf,image/*';
+    uploadInput.click();
+
+    uploadInput.onChange.listen((_) {
+      final files = uploadInput.files;
+      if (files == null || files.length == 0) return;
+      final file = files.item(0)!;
+      final reader = web.FileReader();
+
+      reader.onLoadEnd.listen((_) async {
+        final result = reader.result;
+        if (result == null) return;
+
+        final arrayBuffer = result as JSArrayBuffer;
+        final bytes = (result as ByteBuffer).asUint8List();
+        final fileName = file.name.toLowerCase();
+
+        if (fileName.endsWith('.pdf')) {
+          await _importPdf(arrayBuffer);
+        } else {
+          _addImageToCurrentSlide(bytes);
+        }
+      });
+
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  Future<void> _importPdf(JSArrayBuffer buffer) async {
+    try {
+      final jsImages = await renderPdfToImages(buffer).toDart;
+      final dartImages = jsImages.toDart;
+
+      for (int i = 0; i < dartImages.length; i++) {
+        final dataUrl = dartImages[i].toDart;
+        final base64String = dataUrl.split(',').last;
+        final imageBytes = base64Decode(base64String);
+
+        if (i == 0 && _pages[_currentPageIndex].isEmpty && _pageImages[_currentPageIndex].isEmpty) {
+          _addImageToCurrentSlide(imageBytes, autoFit: true);
+        } else {
+          _pages.add([]);
+          _pageImages.add([]);
+          _currentPageIndex = _pages.length - 1;
+          _addImageToCurrentSlide(imageBytes, autoFit: true);
+        }
+      }
+      _scheduleAutoSave();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void _addImageToCurrentSlide(Uint8List bytes, {bool autoFit = false}) {
+    double initialWidth = autoFit ? (_screenSize.width * 0.75).clamp(320, 1100) : 380;
+    double initialHeight = autoFit ? (_screenSize.height * 0.8).clamp(240, 800) : 260;
+
+    final newImage = BoardImage(
+      bytes: bytes,
+      position: Offset(
+        (_screenSize.width - initialWidth) / 2,
+        (_screenSize.height - initialHeight) / 2,
+      ),
+      width: initialWidth,
+      height: initialHeight,
+      isSelected: !autoFit,
+    );
+
+    _pageImages[_currentPageIndex].add(newImage);
+    notifyListeners();
+  }
+
+  // Image Transformations
+  void selectImage(int index) {
+    for (int i = 0; i < _pageImages[_currentPageIndex].length; i++) {
+      _pageImages[_currentPageIndex][i].isSelected = (i == index);
+    }
+    notifyListeners();
+  }
+
+  void deselectAllImages() {
+    bool changed = false;
+    for (final img in _pageImages[_currentPageIndex]) {
+      if (img.isSelected) {
+        img.isSelected = false;
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
+  void updateImagePosition(int index, Offset delta) {
+    if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
+      _pageImages[_currentPageIndex][index].position += delta;
+      notifyListeners();
+    }
+  }
+
+  void updateImageSize(int index, double deltaWidth, double deltaHeight) {
+    if (index >= 0 && index < _pageImages[_currentPageIndex].length) {
+      final img = _pageImages[_currentPageIndex][index];
+      img.width = (img.width + deltaWidth).clamp(80.0, _screenSize.width * 1.5);
+      img.height = (img.height + deltaHeight).clamp(80.0, _screenSize.height * 1.5);
+      notifyListeners();
+    }
+  }
+
+  void deleteSelectedImage() {
+    _pageImages[_currentPageIndex].removeWhere((img) => img.isSelected);
+    notifyListeners();
   }
 
   void updateScreenSize(Size size) {
@@ -140,6 +270,7 @@ class BoardController extends ChangeNotifier {
 
   void setTool(ToolType tool) {
     _currentTool = tool;
+    deselectAllImages();
     onToolSelected();
     notifyListeners();
   }
@@ -163,6 +294,7 @@ class BoardController extends ChangeNotifier {
 
   void addNewPage() {
     _pages.add([]);
+    _pageImages.add([]);
     _currentPageIndex = _pages.length - 1;
     _redoStack.clear();
     _activeStroke = null;
@@ -183,8 +315,10 @@ class BoardController extends ChangeNotifier {
   void deletePage(int index) {
     if (_pages.length <= 1) {
       _pages[0].clear();
+      _pageImages[0].clear();
     } else {
       _pages.removeAt(index);
+      _pageImages.removeAt(index);
       if (_currentPageIndex > index) {
         _currentPageIndex--;
       } else if (_currentPageIndex >= _pages.length) {
@@ -202,6 +336,7 @@ class BoardController extends ChangeNotifier {
       _currentPageIndex++;
     } else {
       _pages.add([]);
+      _pageImages.add([]);
       _currentPageIndex++;
     }
     _redoStack.clear();
@@ -220,10 +355,8 @@ class BoardController extends ChangeNotifier {
     }
   }
 
-  void startStroke(Offset position, double pressure, [PointerDeviceKind? kind]) {
-    if (_palmRejectionEnabled && kind == PointerDeviceKind.touch) {
-      return;
-    }
+  void startStroke(Offset position, double pressure, [ui.PointerDeviceKind? kind]) {
+    if (_palmRejectionEnabled && kind == ui.PointerDeviceKind.touch) return;
 
     if (_currentTool == ToolType.laser) {
       _laserTrail = [position];
@@ -254,8 +387,8 @@ class BoardController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void appendPoint(Offset position, double pressure, [PointerDeviceKind? kind]) {
-    if (_palmRejectionEnabled && kind == PointerDeviceKind.touch) return;
+  void appendPoint(Offset position, double pressure, [ui.PointerDeviceKind? kind]) {
+    if (_palmRejectionEnabled && kind == ui.PointerDeviceKind.touch) return;
 
     if (_currentTool == ToolType.laser) {
       _laserTrail.add(position);
@@ -313,6 +446,9 @@ class BoardController extends ChangeNotifier {
       _redoStack.add(_pages[_currentPageIndex].removeLast());
       _scheduleAutoSave();
       notifyListeners();
+    } else if (_pageImages[_currentPageIndex].isNotEmpty) {
+      _pageImages[_currentPageIndex].removeLast();
+      notifyListeners();
     }
   }
 
@@ -326,6 +462,7 @@ class BoardController extends ChangeNotifier {
 
   void clearCanvas() {
     _pages[_currentPageIndex].clear();
+    _pageImages[_currentPageIndex].clear();
     _redoStack.clear();
     _activeStroke = null;
     _laserTrail.clear();

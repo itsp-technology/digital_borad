@@ -23,7 +23,7 @@ class FloatingToolbar extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 18.0, sigmaY: 18.0),
           child: Container(
             constraints: BoxConstraints(
-              maxWidth: isMobile ? MediaQuery.of(context).size.width - 16 : 1050,
+              maxWidth: isMobile ? MediaQuery.of(context).size.width - 16 : 1120,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -44,7 +44,6 @@ class FloatingToolbar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 1. Pin Toggle
                   IconButton(
                     tooltip: controller.isToolbarPinned ? 'Pinned' : 'Auto-Hides',
                     icon: Icon(
@@ -54,8 +53,6 @@ class FloatingToolbar extends StatelessWidget {
                     ),
                     onPressed: controller.toggleToolbarPin,
                   ),
-
-                  // 2. Palm Rejection (Stylus only toggle)
                   IconButton(
                     tooltip: controller.palmRejectionEnabled ? 'Stylus Only Mode (Active)' : 'Touch + Stylus',
                     icon: Icon(
@@ -67,7 +64,7 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // 3. Freehand Tools
+                  // Inking Tools
                   _ToolIcon(
                     icon: Icons.edit_rounded,
                     activeColor: const Color(0xFF00FFA3),
@@ -101,7 +98,7 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // 4. Geometric Shapes
+                  // Geometric Shapes
                   _ToolIcon(
                     icon: Icons.horizontal_rule_rounded,
                     activeColor: const Color(0xFF00E5FF),
@@ -135,7 +132,7 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // 5. Colors & Thickness
+                  // Color & Thickness
                   ColorPalette(
                     selectedColor: controller.selectedColor,
                     onColorSelected: controller.setColor,
@@ -147,17 +144,28 @@ class FloatingToolbar extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // 6. Theme, Export, Undo, Redo, Wipe
+                  // Import PDF / Image
+                  IconButton(
+                    tooltip: 'Import PDF / Image to Board',
+                    icon: const Icon(Icons.note_add_rounded, size: 20, color: Color(0xFF00E5FF)),
+                    onPressed: controller.importMedia,
+                  ),
+
+                  // Background Pattern
                   IconButton(
                     tooltip: 'Grid Pattern',
                     icon: const Icon(Icons.grid_4x4_rounded, size: 19, color: Colors.white70),
                     onPressed: controller.toggleTheme,
                   ),
+
+                  // Export Notes
                   IconButton(
                     tooltip: 'Export Slide to Notes',
                     icon: const Icon(Icons.download_rounded, size: 19, color: Color(0xFF00FFA3)),
                     onPressed: onExport,
                   ),
+
+                  // History & Wipe
                   IconButton(
                     tooltip: 'Undo',
                     icon: const Icon(Icons.undo_rounded, size: 19, color: Colors.white70),

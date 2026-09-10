@@ -39,7 +39,6 @@ class SlideDrawer extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Drawer Header with Current Slide Indicator & Close
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
@@ -89,7 +88,7 @@ class SlideDrawer extends StatelessWidget {
                 ),
               ),
 
-              // Slide List with Thumbnails
+              // Slide List
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -97,9 +96,9 @@ class SlideDrawer extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final isSelected = index == controller.currentPageIndex;
                     final slideStrokes = controller.allPages[index];
+                    final slideImages = controller.currentImages;
 
-                    // Determine accurate preview scale factor based on screen aspect ratio
-                    const double previewWidth = 226.0; // 250 container - 24 padding
+                    const double previewWidth = 226.0;
                     const double previewHeight = 125.0;
                     final double scaleX = previewWidth / (screenSize.width > 0 ? screenSize.width : 1920);
                     final double scaleY = previewHeight / (screenSize.height > 0 ? screenSize.height : 1080);
@@ -129,21 +128,35 @@ class SlideDrawer extends StatelessWidget {
                           onTap: () => controller.goToPage(index),
                           child: Stack(
                             children: [
-                              // Slide Preview Canvas (Properly Scaled)
                               Container(
                                 height: previewHeight,
                                 width: double.infinity,
                                 color: const Color(0xFF080B10),
-                                child: CustomPaint(
-                                  size: const Size(previewWidth, previewHeight),
-                                  painter: BoardPainter(
-                                    strokes: slideStrokes,
-                                    activeStroke: null,
-                                    scale: previewScale,
-                                  ),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    if (slideImages.isNotEmpty)
+                                      Positioned(
+                                        left: slideImages.first.position.dx * previewScale,
+                                        top: slideImages.first.position.dy * previewScale,
+                                        width: slideImages.first.width * previewScale,
+                                        height: slideImages.first.height * previewScale,
+                                        child: Image.memory(
+                                          slideImages.first.bytes,
+                                          fit: BoxFit.fill,
+                                        ),
+                                      ),
+                                    CustomPaint(
+                                      size: const Size(previewWidth, previewHeight),
+                                      painter: BoardPainter(
+                                        strokes: slideStrokes,
+                                        activeStroke: null,
+                                        scale: previewScale,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              // Slide Number Chip
                               Positioned(
                                 top: 6,
                                 left: 6,
@@ -167,7 +180,6 @@ class SlideDrawer extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              // Delete Slide Button
                               if (controller.totalPages > 1)
                                 Positioned(
                                   top: 6,
@@ -197,7 +209,7 @@ class SlideDrawer extends StatelessWidget {
                 ),
               ),
 
-              // Bottom "+ Add Slide" Action
+              // Bottom Actions: "+ Add Slide" & "Import Media"
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -205,33 +217,66 @@ class SlideDrawer extends StatelessWidget {
                     top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                 ),
-                child: InkWell(
-                  onTap: controller.addNewPage,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00FFA3).withValues(alpha: 0.15),
+                child: Column(
+                  children: [
+                    InkWell(
+                      onTap: controller.importMedia,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF00FFA3).withValues(alpha: 0.6)),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_rounded, color: Color(0xFF00FFA3), size: 18),
-                        SizedBox(width: 6),
-                        Text(
-                          'Add Slide',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Color(0xFF00FFA3),
-                          ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6)),
                         ),
-                      ],
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.upload_file_rounded, color: Color(0xFF00E5FF), size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'Import PDF / Image',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                color: Color(0xFF00E5FF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: controller.addNewPage,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00FFA3).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF00FFA3).withValues(alpha: 0.6)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_rounded, color: Color(0xFF00FFA3), size: 17),
+                            SizedBox(width: 6),
+                            Text(
+                              'Add Slide',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                color: Color(0xFF00FFA3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

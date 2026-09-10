@@ -6,6 +6,7 @@ import '../../painter/board_painter.dart';
 import '../../state/board_controller.dart';
 import '../widgets/floating_toolbar.dart';
 import '../widgets/grid_background.dart';
+import '../widgets/interactive_image_widget.dart';
 import '../widgets/slide_drawer.dart';
 
 class BoardScreen extends StatefulWidget {
@@ -37,7 +38,7 @@ class _BoardScreenState extends State<BoardScreen> {
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF00FFA3)),
                 const SizedBox(width: 8),
                 Text(
-                  'Slide ${context.read<BoardController>().currentPageIndex + 1} captured successfully!',
+                  'Slide ${context.read<BoardController>().currentPageIndex + 1} exported successfully!',
                   style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
                 ),
               ],
@@ -67,8 +68,20 @@ class _BoardScreenState extends State<BoardScreen> {
           RepaintBoundary(
             key: _canvasKey,
             child: Stack(
+              fit: StackFit.expand,
               children: [
+                // Base background pattern
                 GridBackground(mode: controller.themeMode),
+
+                // Resizable, Zoomable, Movable Images
+                ...controller.currentImages.asMap().entries.map(
+                      (entry) => InteractiveImageWidget(
+                        image: entry.value,
+                        index: entry.key,
+                      ),
+                    ),
+
+                // High-performance Inking Layer
                 Listener(
                   behavior: HitTestBehavior.opaque,
                   onPointerDown: (e) {
